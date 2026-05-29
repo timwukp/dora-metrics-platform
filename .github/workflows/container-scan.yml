@@ -42,7 +42,7 @@ jobs:
         # already failed the build on CRITICAL/HIGH findings.
         if: always()
         continue-on-error: true
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-${{ matrix.target.name }}.sarif
           category: trivy-${{ matrix.target.name }}

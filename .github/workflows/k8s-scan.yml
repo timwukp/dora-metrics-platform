@@ -27,7 +27,7 @@ jobs:
           # Only fail on Critical/High severity misconfigurations.
           # Medium findings are reported but don't break the build.
           failedThreshold: 8
-      - uses: github/codeql-action/upload-sarif@v3
+      - uses: github/codeql-action/upload-sarif@v4
         # SARIF upload requires GitHub Advanced Security on private repos.
         if: always()
         continue-on-error: true
