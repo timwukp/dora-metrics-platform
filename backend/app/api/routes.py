@@ -57,11 +57,15 @@ def _default_repo() -> str:
     return repos[0]
 
 
-def _validate_repo(repo: Optional[str]) -> str:
-    """Ensure caller can only query repos this server is configured to track."""
-    allowed = settings.github_repo_list
+def _validate_repo(repo: Optional[str]) -> Optional[str]:
+    """Ensure caller can only query repos this server is configured to track.
+
+    When repo is None the caller wants data across all configured repos.
+    DoraCalculator treats repo=None as "no filter" so we pass it through.
+    """
     if repo is None:
-        return _default_repo()
+        return None
+    allowed = settings.github_repo_list
     if repo not in allowed:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -201,10 +205,10 @@ def get_reviews(
 ):
     repo = _validate_repo(repo)
     start_dt = datetime.now(timezone.utc) - timedelta(days=days)
-    reviews = db.query(ReviewEvent).filter(
-        ReviewEvent.repo == repo,
-        ReviewEvent.submitted_at >= start_dt,
-    ).all()
+    query = db.query(ReviewEvent).filter(ReviewEvent.submitted_at >= start_dt)
+    if repo is not None:
+        query = query.filter(ReviewEvent.repo == repo)
+    reviews = query.all()
     bot = [r for r in reviews if r.is_bot]
     human = [r for r in reviews if not r.is_bot]
     return {

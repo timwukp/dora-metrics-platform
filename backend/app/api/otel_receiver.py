@@ -1,21 +1,31 @@
 """
 OTLP/HTTP receiver for Claude Code telemetry (Plan A).
 
-Accepts OTLP metric exports directly from the Claude Code CLI when configured with:
+Accepts OTLP metric exports directly from the Claude Code CLI when configured
+with:
     CLAUDE_CODE_ENABLE_TELEMETRY=1
     OTEL_METRICS_EXPORTER=otlp
     OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf  (or http/json)
-    OTEL_EXPORTER_OTLP_ENDPOINT=https://<your-backend>/api/v1/otel
+    OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=https://<your-backend>/api/v1/otel/metrics
     OTEL_EXPORTER_OTLP_HEADERS=x-api-key=<DORA_API_KEY>
 
-The router prefix is /api/v1/otel and the routes are /metrics and /logs,
-so the full paths are /api/v1/otel/metrics and /api/v1/otel/logs.
-Note: the OTLP SDK does NOT append /v1/metrics automatically for custom
-endpoints. Set the endpoint directly to the base URL above and the SDK
-will POST to {endpoint}/v1/metrics -- which matches /api/v1/otel/v1/metrics
-only if the route includes /v1. Since we removed the extra /v1 from the
-route, users should configure their exporter to POST directly:
-    OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=https://<your-backend>/api/v1/otel/metrics
+Endpoint configuration notes (per the OTLP spec):
+
+  The router prefix is /api/v1/otel and the routes are /metrics and /logs,
+  so the full paths are /api/v1/otel/metrics and /api/v1/otel/logs.
+
+  Use the per-signal environment variable:
+    OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=https://<host>/api/v1/otel/metrics
+    OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=https://<host>/api/v1/otel/logs
+
+  The per-signal endpoint is sent to verbatim by the SDK (no path is
+  appended), so it matches our routes exactly.
+
+  Do NOT use the base OTEL_EXPORTER_OTLP_ENDPOINT for this service. Per the
+  OTLP spec, the SDK appends the signal path (e.g. /v1/metrics) to the base
+  endpoint automatically. Setting OTEL_EXPORTER_OTLP_ENDPOINT to
+  https://<host>/api/v1/otel would cause the SDK to POST to
+  https://<host>/api/v1/otel/v1/metrics, which does not match our routes.
 
 Maps known `claude_code.*` metric names into the existing claude_code_sessions
 table, aggregated by (user_email, session_date).
