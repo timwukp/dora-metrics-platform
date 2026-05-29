@@ -7,6 +7,7 @@ on:
     branches: [main]
   schedule:
     - cron: "0 6 * * 1"   # weekly Monday 06:00 UTC
+  workflow_dispatch:       # allow manual trigger for baseline scan
 
 permissions:
   contents: read
@@ -28,5 +29,8 @@ jobs:
           languages: ${{ matrix.language }}
           queries: security-and-quality
       - uses: github/codeql-action/analyze@v3
+        # SARIF processing fails on PRs until main has a baseline scan.
+        # Once this PR merges and the push-to-main scan completes, remove this.
+        continue-on-error: true
         with:
           category: "/language:${{ matrix.language }}"
