@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "fix",
   "description": "Backend fixes: CI pytest step, async background tasks, webhook cleanup, Alembic migrations, SQLite warning, O(n*m) deploy attribution, double /v1 OTLP path, and remove PyGithub dependency",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "STEP 1 - Issue 2a (CI pytest): In `.github/workflows/ci.yml`, add a new step after the 'Import smoke test' step in the `backend-lint-test` job. The step should: set env vars DORA_DATABASE_URL=sqlite:///:memory:, DORA_API_KEY=test-key, DORA_GITHUB_REPOS=octo/repo, DORA_GITHUB_WEBHOOK_SECRET=test-secret, install pytest (add `pip install pytest` to Install step or use requirements-dev.txt), and run `python -m pytest tests/ -v`. Also add pytest to the `pip install` step (change to `pip install -r requirements-dev.txt` instead of `pip install -r requirements.txt`).",
     "STEP 2 - Issue 2b (async background tasks): In `backend/app/api/routes.py`, remove the `_run_with_session` function. Replace it with an async version: `async def _run_with_session_async(coro_factory, *args, label: str)` that opens a SessionLocal(), awaits the coro_factory(db, *args), and closes db in finally (catching exceptions to logger.exception). Then change all `_bg_collect_*` functions from sync to async (async def), calling `await _run_with_session_async(...)` instead of `_run_with_session(...)`. FastAPI's BackgroundTasks supports async callables natively.",
@@ -29,5 +29,5 @@
     "cd /projects/sandbox/dora-metrics-platform/backend && python -m pytest tests/ -v"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All 24 existing tests pass. Python 3.12.13 required pyenv global set. FastAPI 0.136.3 requires Python >=3.10. Alembic autogenerate worked fine with sqlite in-memory. The Settings class uses class-based Config (deprecated in Pydantic V2) but works fine."
 }
