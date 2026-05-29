@@ -27,7 +27,16 @@ jobs:
         with: { persist-credentials: false }
       - name: Build image
         run: docker build -f ${{ matrix.target.dockerfile }} -t dora-${{ matrix.target.name }}:scan .
-      - name: Trivy scan
+      - name: Trivy scan (table — visible in logs)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: dora-${{ matrix.target.name }}:scan
+          format: table
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '1'
+      - name: Trivy scan (sarif — for upload)
+        if: always()
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: dora-${{ matrix.target.name }}:scan
@@ -35,7 +44,7 @@ jobs:
           output: trivy-${{ matrix.target.name }}.sarif
           severity: CRITICAL,HIGH
           ignore-unfixed: true
-          exit-code: '1'
+          exit-code: '0'
       - name: Upload SARIF
         # SARIF upload requires GitHub Advanced Security on private repos.
         # Don't fail the job if upload is rejected — the trivy step itself
