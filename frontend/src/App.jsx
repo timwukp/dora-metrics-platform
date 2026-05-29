@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useApi } from './hooks/useApi'
 import { api } from './services/api'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { DoraScoreCard } from './components/DoraScoreCard'
 import { TrendChart } from './components/TrendChart'
 import { ClaudeCodePanel } from './components/ClaudeCodePanel'
@@ -39,6 +40,7 @@ export default function App() {
                 onChange={(e) => setRepo(e.target.value || null)}
                 value={repo || ''}
               >
+                <option value="">All Repositories</option>
                 {repos.repos.map((r) => (
                   <option key={r} value={r}>{r}</option>
                 ))}
@@ -60,6 +62,7 @@ export default function App() {
       </header>
 
       <main className="max-w-7xl mx-auto px-6 py-8 space-y-8">
+        <ErrorBoundary>
         {(doraNotReady || reposNotReady) && (
           <div className="rounded-md border border-yellow-700/50 bg-yellow-900/20 px-4 py-3 text-sm text-yellow-200">
             Backend is starting or its database isn’t ready yet. Retrying…
@@ -182,6 +185,7 @@ export default function App() {
             </section>
           </>
         )}
+        </ErrorBoundary>
       </main>
 
       <footer className="border-t border-gray-800 px-6 py-4 text-center text-xs text-gray-500">

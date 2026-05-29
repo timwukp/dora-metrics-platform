@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     # ergonomics; ops should set DORA_ENABLE_DOCS=false for public deployments.
     enable_docs: bool = True
 
+    # Gate Base.metadata.create_all — set to False when using Alembic migrations.
+    auto_create_tables: bool = True
+
     # CORS — strict allowlist. Wildcard explicitly rejected.
     cors_origins: str = "http://localhost:5173,http://localhost:3000"
 

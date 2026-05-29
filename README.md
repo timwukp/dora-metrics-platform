@@ -2,8 +2,8 @@
 
 End-to-end platform for measuring engineering performance using DORA (DevOps Research and Assessment) metrics — with first-class integration for **GitHub** and **Claude Code AI telemetry**.
 
-[![CI](https://github.com/REPLACE_OWNER/dora-metrics-platform/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
-[![CodeQL](https://github.com/REPLACE_OWNER/dora-metrics-platform/actions/workflows/codeql.yml/badge.svg)](.github/workflows/codeql.yml)
+[![CI](https://github.com/timwukp/dora-metrics-platform/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
+[![CodeQL](https://github.com/timwukp/dora-metrics-platform/actions/workflows/codeql.yml/badge.svg)](.github/workflows/codeql.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ## What it does

@@ -1,12 +1,31 @@
 """
 OTLP/HTTP receiver for Claude Code telemetry (Plan A).
 
-Accepts OTLP metric exports directly from the Claude Code CLI when configured with:
+Accepts OTLP metric exports directly from the Claude Code CLI when configured
+with:
     CLAUDE_CODE_ENABLE_TELEMETRY=1
     OTEL_METRICS_EXPORTER=otlp
     OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf  (or http/json)
-    OTEL_EXPORTER_OTLP_ENDPOINT=https://<your-backend>/api/v1/otel
+    OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=https://<your-backend>/api/v1/otel/metrics
     OTEL_EXPORTER_OTLP_HEADERS=x-api-key=<DORA_API_KEY>
+
+Endpoint configuration notes (per the OTLP spec):
+
+  The router prefix is /api/v1/otel and the routes are /metrics and /logs,
+  so the full paths are /api/v1/otel/metrics and /api/v1/otel/logs.
+
+  Use the per-signal environment variable:
+    OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=https://<host>/api/v1/otel/metrics
+    OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=https://<host>/api/v1/otel/logs
+
+  The per-signal endpoint is sent to verbatim by the SDK (no path is
+  appended), so it matches our routes exactly.
+
+  Do NOT use the base OTEL_EXPORTER_OTLP_ENDPOINT for this service. Per the
+  OTLP spec, the SDK appends the signal path (e.g. /v1/metrics) to the base
+  endpoint automatically. Setting OTEL_EXPORTER_OTLP_ENDPOINT to
+  https://<host>/api/v1/otel would cause the SDK to POST to
+  https://<host>/api/v1/otel/v1/metrics, which does not match our routes.
 
 Maps known `claude_code.*` metric names into the existing claude_code_sessions
 table, aggregated by (user_email, session_date).
@@ -20,7 +39,7 @@ Aggregation respects OTLP `aggregationTemporality`:
     the last report. We add it to the row.
 
 For more sophisticated routing, sampling, or fan-out to other observability
-backends, run a real OTel Collector in front of this endpoint (Plan B) — see
+backends, run a real OTel Collector in front of this endpoint (Plan B) -- see
 docs/telemetry.md.
 """
 from __future__ import annotations
@@ -330,7 +349,7 @@ def _add_to_session(
 
 
 # ── HTTP entry point ───────────────────────────────────────────────────────
-@router.post("/v1/metrics", dependencies=[Depends(require_api_key)])
+@router.post("/metrics", dependencies=[Depends(require_api_key)])
 async def receive_metrics(request: Request, db: Session = Depends(get_db)):
     """
     OTLP/HTTP metrics endpoint. Accepts:
@@ -372,7 +391,7 @@ async def receive_metrics(request: Request, db: Session = Depends(get_db)):
     return result
 
 
-@router.post("/v1/logs", dependencies=[Depends(require_api_key)])
+@router.post("/logs", dependencies=[Depends(require_api_key)])
 async def receive_logs():
     """Currently a no-op: logs are accepted to keep the CLI from buffering, but
     discarded. To persist Claude Code logs, run an OTel Collector (Plan B) and

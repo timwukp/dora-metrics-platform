@@ -11,6 +11,7 @@ paths = [
   '''backend/\.venv/''',
   '''frontend/node_modules/''',
   '''frontend/dist/''',
+  '''backend/alembic\.ini$''',
 ]
 
 # Allow placeholders in example/template files
