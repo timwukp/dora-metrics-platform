@@ -18,12 +18,11 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from sqlalchemy import and_, func, or_
+from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
 
 from app.models.events import (
-    ClaudeCodeSession, Commit, Deployment, Incident, PullRequest, ReviewEvent,
-    WorkflowRun,
+    ClaudeCodeSession, Deployment, Incident, PullRequest, WorkflowRun,
 )
 from app.services.stats import median, mean, percentile
 

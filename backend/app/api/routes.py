@@ -36,7 +36,7 @@ from app.collectors.github_collector import GitHubCollector
 from app.config.settings import settings
 from app.models.database import SessionLocal, get_db
 from app.models.events import (
-    Deployment, PullRequest, ReviewEvent, WebhookDelivery, WorkflowRun,
+    ReviewEvent, WebhookDelivery,
 )
 from app.services.dora_calculator import DoraCalculator
 

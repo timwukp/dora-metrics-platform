@@ -118,7 +118,7 @@ class GitHubCollector:
 
         title = pr_data.get("title") or ""
         branch = (pr_data.get("head") or {}).get("ref")
-        labels = [l.get("name") for l in pr_data.get("labels", []) if l.get("name")]
+        labels = [lbl.get("name") for lbl in pr_data.get("labels", []) if lbl.get("name")]
 
         pr_record_kwargs = dict(
             repo=repo,

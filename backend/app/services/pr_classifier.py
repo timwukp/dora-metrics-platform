@@ -7,7 +7,7 @@ production hotfixes / reverts, plus an explicit label override.
 from __future__ import annotations
 
 import re
-from typing import Iterable, Mapping
+from typing import Iterable
 
 # Branch / title patterns. Anchored — no `feat/fix-tooltip` false positives.
 _HOTFIX_BRANCH_RE = re.compile(r"^(hotfix|patch)([/_\-]|$)", re.IGNORECASE)
@@ -16,7 +16,7 @@ _REVERT_TITLE_RE = re.compile(r"^revert\b", re.IGNORECASE)
 
 
 def is_revert(title: str | None, labels: Iterable[str] | None = None) -> bool:
-    if labels and any((l or "").lower() == "revert" for l in labels):
+    if labels and any((label or "").lower() == "revert" for label in labels):
         return True
     if not title:
         return False
@@ -28,7 +28,7 @@ def is_hotfix(
     branch: str | None,
     labels: Iterable[str] | None = None,
 ) -> bool:
-    if labels and any((l or "").lower() in {"hotfix", "incident"} for l in labels):
+    if labels and any((label or "").lower() in {"hotfix", "incident"} for label in labels):
         return True
     if title and _HOTFIX_TITLE_RE.match(title.strip()):
         return True

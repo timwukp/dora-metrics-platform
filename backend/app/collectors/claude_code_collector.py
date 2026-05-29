@@ -1,5 +1,5 @@
 import httpx
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
 from sqlalchemy.orm import Session
 from app.config.settings import settings
