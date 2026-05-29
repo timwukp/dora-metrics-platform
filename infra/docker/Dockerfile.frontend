@@ -20,7 +20,7 @@ COPY frontend/ .
 RUN npm run build
 
 # ─── Runtime ──────────────────────────────────────────────────
-FROM nginx:1.27-alpine AS runtime
+FROM nginx:1.31-alpine AS runtime
 
 # Drop all default nginx config; install ours.
 RUN rm -rf /etc/nginx/conf.d/* /usr/share/nginx/html/* \

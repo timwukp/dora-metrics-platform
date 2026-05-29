@@ -1,4 +1,6 @@
-fastapi==0.115.0
+fastapi==0.115.6
+# starlette<0.40 has CVE-2024-47874 (DoS via multipart parsing).
+# fastapi 0.115.6 pins starlette>=0.40.
 uvicorn[standard]==0.30.6
 sqlalchemy==2.0.35
 alembic==1.13.2
@@ -13,4 +15,6 @@ opentelemetry-api==1.27.0
 opentelemetry-sdk==1.27.0
 opentelemetry-exporter-otlp==1.27.0
 opentelemetry-proto==1.27.0
-protobuf==4.25.5
+# protobuf <4.25.8 has CVE-2025-4565 / CVE-2026-0994 (DoS via deeply
+# nested messages on the pure-Python backend).
+protobuf==4.25.8
