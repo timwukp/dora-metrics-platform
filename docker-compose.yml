@@ -1,0 +1,98 @@
+# Local-only compose. For production use the K8s/EKS manifests.
+# Requires a .env file at the repo root — see backend/.env.example.
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-dora_metrics}
+      POSTGRES_USER: ${POSTGRES_USER:-dora}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    # No host port published — only reachable from the compose network.
+    expose:
+      - "5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dora} -d ${POSTGRES_DB:-dora_metrics}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+      - DAC_OVERRIDE
+
+  backend:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.backend
+    # Bind to localhost only — frontend reaches it via the compose network.
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      DORA_DATABASE_URL: postgresql://${POSTGRES_USER:-dora}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-dora_metrics}
+      DORA_GITHUB_TOKEN: ${DORA_GITHUB_TOKEN:?DORA_GITHUB_TOKEN is required}
+      DORA_GITHUB_REPOS: ${DORA_GITHUB_REPOS:?DORA_GITHUB_REPOS is required}
+      DORA_GITHUB_WEBHOOK_SECRET: ${DORA_GITHUB_WEBHOOK_SECRET:?DORA_GITHUB_WEBHOOK_SECRET is required}
+      DORA_API_KEY: ${DORA_API_KEY:?DORA_API_KEY is required}
+      DORA_CLAUDE_CODE_ADMIN_KEY: ${DORA_CLAUDE_CODE_ADMIN_KEY:-}
+      DORA_POLL_INTERVAL_MINUTES: ${DORA_POLL_INTERVAL_MINUTES:-15}
+      DORA_CORS_ORIGINS: ${DORA_CORS_ORIGINS:-http://localhost:3000}
+      DORA_LOG_LEVEL: ${DORA_LOG_LEVEL:-INFO}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  frontend:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.frontend
+    ports:
+      - "127.0.0.1:3000:8080"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  # Optional: OpenTelemetry Collector. Disabled by default — enable with:
+  #   docker compose --profile otel up -d
+  otel-collector:
+    profiles: ["otel"]
+    image: otel/opentelemetry-collector-contrib:0.108.0
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collector/config.yaml:/etc/otel-collector-config.yaml:ro
+    ports:
+      - "127.0.0.1:4317:4317"
+      - "127.0.0.1:4318:4318"
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+volumes:
+  pgdata:

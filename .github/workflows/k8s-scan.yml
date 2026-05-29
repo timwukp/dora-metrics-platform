@@ -1,0 +1,31 @@
+name: Kubernetes Manifest Scan
+
+on:
+  pull_request:
+    paths: ["infra/k8s/**"]
+  push:
+    branches: [main]
+    paths: ["infra/k8s/**"]
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  kubescape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { persist-credentials: false }
+      - name: Kubescape scan
+        uses: kubescape/github-action@main
+        with:
+          files: infra/k8s
+          frameworks: nsa,mitre,armobest
+          format: sarif
+          outputFile: kubescape.sarif
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: kubescape.sarif
+          category: kubescape

@@ -1,0 +1,28 @@
+title = "DORA Metrics Platform — gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Allowlisted paths and known placeholders"
+paths = [
+  '''(.*?)\.lock$''',
+  '''package-lock\.json$''',
+  '''backend/\.venv/''',
+  '''frontend/node_modules/''',
+  '''frontend/dist/''',
+]
+
+# Allow placeholders in example/template files
+regexes = [
+  '''ghp_x{10,}''',
+  '''github_pat_\.\.\.''',
+  '''sk-ant-admin-(x{4,}|\.\.\.)''',
+  '''REPLACE_WITH_[A-Z_]+''',
+  '''REPLACE_(CERT_ID|OWNER|AT_DEPLOY)''',
+  '''CHANGE_ME[A-Z_]*''',
+  '''placeholder''',
+  '''<\d+-byte hex>''',
+  '''<random token>''',
+  '''<strong>''',
+]

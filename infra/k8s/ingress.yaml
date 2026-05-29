@@ -1,0 +1,39 @@
+# AWS Load Balancer Controller (ALB) ingress with TLS, redirect, and optional
+# WAF. Requires:
+#   - aws-load-balancer-controller installed in the cluster
+#   - ACM certificate for your domain in the same region
+#   - (optional) AWS WAFv2 ACL for protection
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dora-ingress
+  namespace: dora-metrics
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+    alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS13-1-2-2021-06
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:${AWS_REGION}:${AWS_ACCOUNT_ID}:certificate/REPLACE_CERT_ID
+    # Optional WAF — uncomment after creating WAFv2 ACL
+    # alb.ingress.kubernetes.io/wafv2-acl-arn: arn:aws:wafv2:${AWS_REGION}:${AWS_ACCOUNT_ID}:regional/webacl/dora-waf/REPLACE
+    alb.ingress.kubernetes.io/healthcheck-path: /healthz
+    alb.ingress.kubernetes.io/load-balancer-attributes: routing.http.drop_invalid_header_fields.enabled=true,routing.http.xff_header_processing.mode=append
+spec:
+  ingressClassName: alb
+  rules:
+    - host: dora.example.com   # CHANGE
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: dora-backend
+                port: { name: http }
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: dora-frontend
+                port: { name: http }

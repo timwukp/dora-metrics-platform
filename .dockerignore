@@ -1,0 +1,48 @@
+**/.git
+**/.gitignore
+**/.dockerignore
+
+# Secrets — never bake into images
+**/.env
+**/.env.*
+!**/.env.example
+**/secrets.yaml
+**/*.pem
+**/*.key
+
+# Python
+**/__pycache__
+**/*.py[cod]
+**/.venv
+**/venv
+**/.mypy_cache
+**/.pytest_cache
+**/.ruff_cache
+**/.coverage
+**/htmlcov
+
+# Node
+**/node_modules
+**/.npm
+**/.yarn
+
+# Build output (rebuilt inside container)
+frontend/dist
+backend/build
+
+# IDE
+**/.vscode
+**/.idea
+**/*.swp
+**/.DS_Store
+
+# Docs / non-runtime
+docs/
+*.md
+!README.md
+.github/
+.pre-commit-config.yaml
+
+# CI artifacts
+**/coverage
+**/.tox

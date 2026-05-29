@@ -1,0 +1,44 @@
+name: Container Image Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - "infra/docker/**"
+      - "backend/**"
+      - "frontend/**"
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  trivy:
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - { name: backend,  dockerfile: infra/docker/Dockerfile.backend }
+          - { name: frontend, dockerfile: infra/docker/Dockerfile.frontend }
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { persist-credentials: false }
+      - name: Build image
+        run: docker build -f ${{ matrix.target.dockerfile }} -t dora-${{ matrix.target.name }}:scan .
+      - name: Trivy scan
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: dora-${{ matrix.target.name }}:scan
+          format: sarif
+          output: trivy-${{ matrix.target.name }}.sarif
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '1'
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-${{ matrix.target.name }}.sarif
+          category: trivy-${{ matrix.target.name }}

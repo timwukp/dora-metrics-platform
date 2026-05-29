@@ -1,0 +1,87 @@
+# In-cluster Postgres for kind/dev/CI. PRODUCTION should use Amazon RDS with
+# IAM auth + IRSA — see docs/EKS-DEPLOY.md.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: dora-metrics
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels: { app: postgres }
+  template:
+    metadata:
+      labels: { app: postgres }
+    spec:
+      serviceAccountName: postgres
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 70                # postgres in postgres:alpine
+        runAsGroup: 70
+        fsGroup: 70
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - { name: pg, containerPort: 5432 }
+          env:
+            - { name: POSTGRES_DB,   value: dora_metrics }
+            - { name: POSTGRES_USER, value: dora }
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: dora-secrets, key: POSTGRES_PASSWORD }
+            - { name: PGDATA, value: /var/lib/postgresql/data/pgdata }
+          args:
+            - "-c"
+            - "ssl=off"            # in-cluster only; flip on for RDS-style setup
+            - "-c"
+            - "log_connections=on"
+            - "-c"
+            - "log_disconnections=on"
+          resources:
+            requests: { cpu: "250m", memory: "256Mi" }
+            limits:   { cpu: "1",    memory: "1Gi" }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 70
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/postgresql/data }
+            - { name: run,  mountPath: /var/run/postgresql }
+            - { name: tmp,  mountPath: /tmp }
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "dora", "-d", "dora_metrics"]
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "dora", "-d", "dora_metrics"]
+            initialDelaySeconds: 30
+            periodSeconds: 30
+      volumes:
+        - { name: run, emptyDir: {} }
+        - { name: tmp, emptyDir: {} }
+  volumeClaimTemplates:
+    - metadata: { name: data }
+      spec:
+        accessModes: [ReadWriteOnce]
+        storageClassName: gp3
+        resources:
+          requests:
+            storage: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: dora-metrics
+spec:
+  selector: { app: postgres }
+  ports:
+    - { port: 5432, targetPort: pg }
+  clusterIP: None

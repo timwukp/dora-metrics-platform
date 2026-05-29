@@ -1,0 +1,100 @@
+# Default-deny all ingress and egress in the namespace, then explicitly allow
+# only the flows we need. Requires a CNI that enforces NetworkPolicy
+# (Calico, Cilium, or AWS VPC CNI with NetworkPolicy enabled).
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: dora-metrics
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+# Frontend: accept from ALB ingress controller, egress to backend + DNS
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dora-frontend
+  namespace: dora-metrics
+spec:
+  podSelector:
+    matchLabels: { app: dora-frontend }
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: kube-system }
+      ports: [{ protocol: TCP, port: 8080 }]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels: { app: dora-backend }
+      ports: [{ protocol: TCP, port: 8000 }]
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels: { k8s-app: kube-dns }
+      ports:
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }
+---
+# Backend: accept from frontend + ALB; egress to postgres, GitHub API, Anthropic API, DNS
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dora-backend
+  namespace: dora-metrics
+spec:
+  podSelector:
+    matchLabels: { app: dora-backend }
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: { app: dora-frontend }
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: kube-system }
+      ports: [{ protocol: TCP, port: 8000 }]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels: { app: postgres }
+      ports: [{ protocol: TCP, port: 5432 }]
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels: { k8s-app: kube-dns }
+      ports:
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }
+    # Egress to GitHub & Anthropic over HTTPS. K8s NetworkPolicy can't match
+    # by hostname; tighten with an egress proxy or Cilium FQDN policy in prod.
+    - to:
+        - ipBlock: { cidr: 0.0.0.0/0 }
+      ports:
+        - { protocol: TCP, port: 443 }
+---
+# Postgres: only accept from backend
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres
+  namespace: dora-metrics
+spec:
+  podSelector:
+    matchLabels: { app: postgres }
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: { app: dora-backend }
+      ports: [{ protocol: TCP, port: 5432 }]
+  egress:
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels: { k8s-app: kube-dns }
+      ports:
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }

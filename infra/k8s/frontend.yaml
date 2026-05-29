@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dora-frontend
+  namespace: dora-metrics
+  labels: { app: dora-frontend }
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+  selector:
+    matchLabels: { app: dora-frontend }
+  template:
+    metadata:
+      labels: { app: dora-frontend }
+    spec:
+      serviceAccountName: dora-frontend
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101            # nginx user in nginx:alpine
+        runAsGroup: 101
+        fsGroup: 101
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: frontend
+          image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/dora-frontend:${IMAGE_TAG}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - { name: http, containerPort: 8080 }
+          resources:
+            requests: { cpu: "50m", memory: "64Mi" }
+            limits:   { cpu: "200m", memory: "128Mi" }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 101
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: nginx-cache, mountPath: /var/cache/nginx }
+            - { name: nginx-run,   mountPath: /var/run }
+            - { name: tmp,         mountPath: /tmp }
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 30
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 10
+      volumes:
+        - { name: nginx-cache, emptyDir: { sizeLimit: 64Mi } }
+        - { name: nginx-run,   emptyDir: { sizeLimit: 8Mi } }
+        - { name: tmp,         emptyDir: { medium: Memory, sizeLimit: 16Mi } }
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels: { app: dora-frontend }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dora-frontend
+  namespace: dora-metrics
+spec:
+  type: ClusterIP
+  selector: { app: dora-frontend }
+  ports:
+    - { name: http, port: 8080, targetPort: http }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: dora-frontend
+  namespace: dora-metrics
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: { app: dora-frontend }
