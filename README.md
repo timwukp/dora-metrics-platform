@@ -6,6 +6,8 @@ End-to-end platform for measuring engineering performance using DORA (DevOps Res
 [![CodeQL](https://github.com/timwukp/dora-metrics-platform/actions/workflows/codeql.yml/badge.svg)](.github/workflows/codeql.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+> **[繁體中文版 (Traditional Chinese)](README.zh-TW.md)**
+
 ## Why DORA metrics?
 
 Most engineering teams ship code every day but can't answer basic questions: *Are we actually getting faster? Is quality improving or declining? How do we compare to industry benchmarks?*
