@@ -9,7 +9,6 @@ pydantic==2.9.2
 pydantic-settings==2.5.2
 apscheduler==3.10.4
 python-dateutil==2.9.0
-PyGithub==2.4.0
 # Bumped to 1.30 so we can use protobuf ≥ 5 (otel-proto 1.27 caps protobuf<5).
 opentelemetry-api==1.30.0
 opentelemetry-sdk==1.30.0

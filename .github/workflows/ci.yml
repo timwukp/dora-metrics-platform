@@ -27,7 +27,7 @@ jobs:
         working-directory: backend
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
           pip install ruff bandit
       - name: Lint (ruff)
         working-directory: backend
@@ -43,6 +43,14 @@ jobs:
           DORA_GITHUB_WEBHOOK_SECRET: x
           DORA_API_KEY: x
         run: python -c "from app.main import app; print('ok')"
+      - name: Test (pytest)
+        working-directory: backend
+        env:
+          DORA_DATABASE_URL: "sqlite:///:memory:"
+          DORA_API_KEY: test-key
+          DORA_GITHUB_REPOS: octo/repo
+          DORA_GITHUB_WEBHOOK_SECRET: test-secret
+        run: python -m pytest tests/ -v
 
   frontend-build:
     runs-on: ubuntu-latest

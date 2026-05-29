@@ -85,19 +85,17 @@ def _parse_range(start: Optional[str], end: Optional[str], days: int):
     return start_dt, end_dt
 
 
-def _run_with_session(coro_factory, *args, label: str):
+async def _run_with_session_async(coro_factory, *args, label: str):
     """Run an async collector function with its own DB session lifecycle.
 
     `coro_factory` is the bound method (e.g. `collector.collect_pull_requests`).
-    We open a fresh `SessionLocal()` here — never reuse the request session —
+    We open a fresh `SessionLocal()` here -- never reuse the request session --
     and close it in `finally`. Exceptions are logged and swallowed so a single
     failed task doesn't kill the worker.
     """
-    import asyncio  # local import — only needed in the background path
-
     db = SessionLocal()
     try:
-        asyncio.run(coro_factory(db, *args))
+        await coro_factory(db, *args)
     except Exception:
         logger.exception("background task %s failed", label)
     finally:
@@ -221,30 +219,30 @@ def get_reviews(
 
 
 # ── Manual triggers ───────────────────────────────────────────────────────
-def _bg_collect_all(repo: str):
-    _run_with_session(GitHubCollector().collect_all, repo, label=f"collect_all:{repo}")
+async def _bg_collect_all(repo: str):
+    await _run_with_session_async(GitHubCollector().collect_all, repo, label=f"collect_all:{repo}")
 
 
-def _bg_collect_prs(repo: str):
-    _run_with_session(
+async def _bg_collect_prs(repo: str):
+    await _run_with_session_async(
         GitHubCollector().collect_pull_requests, repo, label=f"collect_prs:{repo}",
     )
 
 
-def _bg_collect_runs(repo: str):
-    _run_with_session(
+async def _bg_collect_runs(repo: str):
+    await _run_with_session_async(
         GitHubCollector().collect_workflow_runs, repo, label=f"collect_runs:{repo}",
     )
 
 
-def _bg_collect_deploys(repo: str):
-    _run_with_session(
+async def _bg_collect_deploys(repo: str):
+    await _run_with_session_async(
         GitHubCollector().collect_deployments, repo, label=f"collect_deploys:{repo}",
     )
 
 
-def _bg_collect_claude_code(start: str):
-    _run_with_session(
+async def _bg_collect_claude_code(start: str):
+    await _run_with_session_async(
         ClaudeCodeCollector().collect, start, label=f"claude_code:{start}",
     )
 

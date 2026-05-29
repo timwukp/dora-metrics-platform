@@ -35,6 +35,7 @@ from app.collectors.claude_code_collector import ClaudeCodeCollector
 from app.collectors.github_collector import GitHubCollector
 from app.config.settings import settings
 from app.models.database import Base, SessionLocal, engine
+from app.models.events import WebhookDelivery
 from app.services.leader import leader_lock
 
 logging.basicConfig(
@@ -82,9 +83,33 @@ async def scheduled_claude_code_collection():
             db.close()
 
 
+async def scheduled_webhook_cleanup():
+    with leader_lock("webhook_cleanup") as is_leader:
+        if not is_leader:
+            return
+        db = SessionLocal()
+        try:
+            cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+            db.query(WebhookDelivery).filter(
+                WebhookDelivery.received_at < cutoff,
+            ).delete()
+            db.commit()
+            logger.info("Webhook delivery cleanup completed")
+        except Exception:
+            logger.exception("Webhook delivery cleanup failed")
+        finally:
+            db.close()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    Base.metadata.create_all(bind=engine)
+    if settings.auto_create_tables:
+        Base.metadata.create_all(bind=engine)
+    if not settings.database_url.startswith("postgresql://") and not settings.enable_docs:
+        logger.warning(
+            "Running with a non-PostgreSQL database in production mode "
+            "(enable_docs=False). This is not recommended."
+        )
     scheduler.add_job(
         scheduled_github_collection, "interval",
         minutes=settings.poll_interval_minutes, id="github_collection",
@@ -92,6 +117,10 @@ async def lifespan(app: FastAPI):
     scheduler.add_job(
         scheduled_claude_code_collection, "interval",
         minutes=60, id="claude_code_collection",
+    )
+    scheduler.add_job(
+        scheduled_webhook_cleanup, "interval",
+        hours=24, id="webhook_cleanup",
     )
     scheduler.start()
     asyncio.create_task(scheduled_github_collection())

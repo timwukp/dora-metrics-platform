@@ -15,6 +15,7 @@ Definitions follow the DORA / "Accelerate" canon:
 """
 from __future__ import annotations
 
+import bisect
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -577,13 +578,13 @@ def _round(v, ndigits):
 def _first_deploy_after(deploys: list[Deployment], pr: PullRequest) -> Optional[datetime]:
     """Find the first prod deploy whose deployed_at is at or after pr.merged_at.
 
-    `deploys` must be ascending-sorted on deployed_at. We use a linear scan;
-    typical PR counts per window keep this O(n*m) but n*m is small (< 10k).
-    For larger volumes a bisect would be a drop-in upgrade.
+    `deploys` must be ascending-sorted on deployed_at. Uses bisect for O(log n)
+    lookup instead of a linear scan.
     """
-    if pr.merged_at is None:
+    if pr.merged_at is None or not deploys:
         return None
-    for d in deploys:
-        if d.deployed_at and d.deployed_at >= pr.merged_at:
-            return d.deployed_at
+    timestamps = [d.deployed_at for d in deploys]
+    idx = bisect.bisect_left(timestamps, pr.merged_at)
+    if idx < len(deploys):
+        return deploys[idx].deployed_at
     return None
