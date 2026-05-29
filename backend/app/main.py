@@ -123,8 +123,14 @@ async def lifespan(app: FastAPI):
         hours=24, id="webhook_cleanup",
     )
     scheduler.start()
-    asyncio.create_task(scheduled_github_collection())
-    asyncio.create_task(scheduled_claude_code_collection())
+
+    async def _initial_collection():
+        """First collection after a short delay so DB/network are ready."""
+        await asyncio.sleep(10)
+        await scheduled_github_collection()
+        await scheduled_claude_code_collection()
+
+    asyncio.create_task(_initial_collection())
     yield
     scheduler.shutdown()
 
