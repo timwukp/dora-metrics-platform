@@ -132,6 +132,11 @@ If you're about to make a non-trivial change and can't find the
 *why* in any of the three above, that's a signal to either open a
 new issue or ask before coding.
 
+**Before opening an issue or PR, read
+[`docs/methodology/change-discipline.md`](docs/methodology/change-discipline.md)** —
+it covers issue granularity, PR sizing, branch naming, and the
+templates under `.github/`.
+
 ---
 
 ## Communication conventions
@@ -159,6 +164,7 @@ new issue or ask before coding.
 | How telemetry is collected | [`docs/telemetry.md`](docs/telemetry.md), [`docs/telemetry-requirements.md`](docs/telemetry-requirements.md) |
 | What was built recently and how | [`docs/test-reports/`](docs/test-reports/) |
 | Open architectural questions | [GitHub issues with `discussion` or `question` label](../../issues?q=is%3Aissue+label%3Adiscussion%2Cquestion) |
+| How to file an issue or open a PR (process) | [`docs/methodology/change-discipline.md`](docs/methodology/change-discipline.md) |
 | The methodology behind this onboarding doc | [`docs/methodology/agent-onboarding.md`](docs/methodology/agent-onboarding.md) |
 
 ---
@@ -174,7 +180,11 @@ etc.) reading this:
 3. **Check open issues with the `discussion` label** before changing
    code in any area that has one. The maintainer's working
    assumptions are written into them.
-4. **Don't invent context.** If something isn't documented, ask.
-5. **Don't write planning docs unless asked.** Don't create
+4. **Follow the change-discipline workflow** in
+   [`docs/methodology/change-discipline.md`](docs/methodology/change-discipline.md):
+   audit broadly, file findings as separate issues, one logical
+   change per PR. Stacked PRs are an exception, not a default.
+5. **Don't invent context.** If something isn't documented, ask.
+6. **Don't write planning docs unless asked.** Don't create
    `IMPLEMENTATION-PLAN.md` or `CHANGES.md` files. Use the conversation
    and the PR description.
