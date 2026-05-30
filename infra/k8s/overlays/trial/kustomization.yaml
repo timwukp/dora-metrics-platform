@@ -1,0 +1,38 @@
+# Trial overlay — port-forward only, no Ingress, no External Secrets, no ALB.
+#
+# Includes in-cluster Postgres for cheap evaluation. Secret is expected to be
+# created out-of-band (see scripts/trial-bootstrap.sh).
+#
+# Deploy:
+#   ./scripts/build-and-push.sh
+#   ./scripts/trial-bootstrap.sh   # creates the dora-secrets Secret
+#   kubectl apply -k infra/k8s/overlays/trial
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+  - postgres.yaml
+
+# Image pinning — these get filled in by `kustomize edit set image` in
+# scripts/build-and-push.sh, OR you can edit them here directly.
+images:
+  - name: dora-backend
+    newName: dora-backend
+    newTag: placeholder
+  - name: dora-frontend
+    newName: dora-frontend
+    newTag: placeholder
+
+patches:
+  # Trial uses 1 replica (cheaper, faster pod scheduling on Fargate).
+  - target: { kind: Deployment, name: dora-backend }
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  - target: { kind: Deployment, name: dora-frontend }
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
