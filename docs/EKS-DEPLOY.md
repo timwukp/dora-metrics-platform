@@ -240,19 +240,61 @@ kubectl -n dora-metrics exec deploy/dora-backend -- \
 
 ## Fargate clusters
 
-EKS Fargate does **not** enforce NetworkPolicy. The shipped `networkpolicy.yaml`
-will apply (`kubectl apply` succeeds) but be silently ignored at runtime —
-because Fargate uses its own datapath and does not run a DaemonSet-capable CNI.
+> ⚠️ **Security caveat:** EKS Fargate does **not** enforce NetworkPolicy.
+> The shipped `default-deny-all` NetworkPolicy and per-app policies will
+> apply (`kubectl apply` succeeds), but Fargate's datapath silently ignores
+> them. The README's "default-deny NetworkPolicy" claim does not hold on a
+> Fargate-only cluster — you have to replace it with one of the
+> alternatives below.
 
-If your cluster is Fargate-only, replace network isolation with one of:
+### Why
 
-1. **Security Groups for Pods (SGP)** — attach SGs via `SecurityGroupPolicy` CRD; restrict egress at the SG level
-   - https://docs.aws.amazon.com/eks/latest/userguide/security-groups-pods.html
-2. **VPC NACLs** — restrict outbound at subnet level
-3. **Service mesh** — App Mesh or Linkerd for east-west mTLS
+Fargate uses its own micro-VM datapath; it doesn't run a DaemonSet-capable
+CNI such as Calico/Cilium, and the in-tree VPC CNI policy mode doesn't
+apply to Fargate pods either. There is currently no way to install a
+NetworkPolicy enforcer on Fargate.
+
+### Detect-and-warn
+
+The backend reads its node name via the downward API
+(`spec.nodeName` → `K8S_NODE_NAME`) at startup. Fargate-scheduled pods
+always run on nodes named `fargate-…`, so the lifespan logs a loud
+`WARNING` when it detects one:
+
+```
+WARNING app.main: DETECTED EKS FARGATE NODE (fargate-ip-…):
+  NetworkPolicy is NOT enforced on Fargate. The shipped default-deny-all
+  NetworkPolicy is a silent no-op. Use Security Groups for Pods (SGP) or
+  replace Fargate with a managed node group.
+  See docs/EKS-DEPLOY.md#fargate-clusters
+```
+
+You'll see this in `kubectl logs deploy/dora-backend -n dora-metrics`. If
+you see it on a cluster you intended to be NetworkPolicy-enforced, treat
+it as a security regression and switch to one of the options below.
+
+### Replacements
+
+For Fargate-only clusters, replace network isolation with **one** of:
+
+1. **Security Groups for Pods (SGP)** — attach SGs via the
+   `SecurityGroupPolicy` CRD; restrict egress at the SG level. Works on
+   Fargate with the `vpc.amazonaws.com/has-trunk-attached` label.
+   - <https://docs.aws.amazon.com/eks/latest/userguide/security-groups-pods.html>
+2. **VPC NACLs** — restrict outbound at subnet level. Coarse-grained
+   (per-subnet, not per-pod) but cheap and Fargate-compatible.
+3. **Service mesh** — App Mesh, Linkerd, or Istio for east-west mTLS +
+   policy. Heaviest option; only worth it if you already run a mesh.
 
 Or use a **managed node group** (EC2-backed) instead of Fargate to keep
-NetworkPolicy semantics. The trial-mode flow above works either way.
+NetworkPolicy semantics natively. The trial-mode flow above works either
+way — only the Fargate flag flips between cluster types.
 
-The backend logs a warning at startup if it detects it is running on Fargate
-without compensating controls.
+### Quick check whether your cluster is Fargate-only
+
+```bash
+kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.labels.eks\.amazonaws\.com/compute-type}{"\n"}{end}' | sort -u
+# Output of `fargate` only → Fargate-only cluster, NetworkPolicy is NOT enforced
+# Output of `ec2` (or empty) → managed node group, NetworkPolicy IS enforced if a CNI supports it
+# Mixed output → check pod placement; Fargate pods skip enforcement, EC2 pods don't
+```

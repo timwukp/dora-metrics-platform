@@ -40,6 +40,11 @@ spec:
             - { name: DORA_POLL_INTERVAL_MINUTES,  value: "15" }
             - { name: DORA_CORS_ORIGINS,           value: "http://localhost:3000" }
             - { name: DORA_LOG_LEVEL,              value: "INFO" }
+            # Downward API — used to detect Fargate at startup so we can
+            # warn that NetworkPolicy is silently no-op there (#26).
+            - name: K8S_NODE_NAME
+              valueFrom:
+                fieldRef: { fieldPath: spec.nodeName }
           resources:
             requests: { cpu: "250m", memory: "256Mi" }
             limits:   { cpu: "1",    memory: "512Mi" }
