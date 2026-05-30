@@ -26,12 +26,40 @@ class Settings(BaseSettings):
     poll_interval_minutes: int = 15
     log_level: str = "INFO"
 
+    # Sprint schedule (per-team Scrum alignment). Optional — when unset, the
+    # /sprints endpoint returns an empty schedule and the dashboard hides the
+    # selector. Format: "<anchor-iso-date>:<length-days>" (e.g. "2026-01-06:14"
+    # for 2-week sprints starting Jan 6). Sprint N is the N-th window after
+    # the anchor; we expose the most recent 12 + the next 1 in the API.
+    sprint_schedule: str = ""
+
+    # ── Alerts (issue #15) — stub mode by default ────────────────────────
+    alerts_enabled: bool = False
+    # Slack incoming webhook URL. None / empty → dispatcher logs the would-be
+    # payload at INFO and returns. We don't 500 if it's unset; alerts are an
+    # optional feature.
+    alerts_slack_webhook: Optional[str] = None
+    # Comma-separated email addresses; empty disables email channel.
+    alerts_email_to: str = ""
+    # SMTP host:port. Empty → email dispatch is also a no-op log.
+    alerts_smtp: str = ""
+
+    # ── Incident webhooks (issue #17) — stub mode ────────────────────────
+    # PagerDuty signs webhooks with HMAC-SHA256 over the body using the secret
+    # configured on the V3 webhook subscription. OpsGenie supports a similar
+    # token header. When unset we accept the request without a signature
+    # check — handy for local testing, but operators should set these in
+    # any deployment that receives real traffic.
+    pagerduty_webhook_secret: Optional[str] = None
+    opsgenie_webhook_secret: Optional[str] = None
+    # repo to attribute incidents to when the webhook payload doesn't
+    # include enough context to map services → repos. Empty → use first
+    # configured repo.
+    incident_default_repo: str = ""
+
     # Disable /docs and /openapi.json in production. Default is on for dev
     # ergonomics; ops should set DORA_ENABLE_DOCS=false for public deployments.
     enable_docs: bool = True
-
-    # Gate Base.metadata.create_all — set to False when using Alembic migrations.
-    auto_create_tables: bool = True
 
     # CORS — strict allowlist. Wildcard explicitly rejected.
     cors_origins: str = "http://localhost:5173,http://localhost:3000"

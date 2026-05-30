@@ -55,33 +55,62 @@ async function fetchJson(path, params = {}, init = {}) {
   return body
 }
 
+// Components pass either `{ days }` for "last N days" or `{ start, end }` for
+// an explicit window (e.g. a Sprint). `buildRange` flattens that to the query
+// params the backend expects, dropping anything undefined.
+function buildRange({ days, start, end }) {
+  if (start && end) return { start, end }
+  return { days }
+}
+
 export const api = {
-  getDoraSummary: (repo, days = 30) =>
-    fetchJson(`${BASE_URL}/metrics/dora`, { repo, days }),
+  getDoraSummary: (repo, range) =>
+    fetchJson(`${BASE_URL}/metrics/dora`, { repo, ...buildRange(range) }),
 
-  getDeployFrequency: (repo, days = 30) =>
-    fetchJson(`${BASE_URL}/metrics/deploy-freq`, { repo, days }),
+  getDeployFrequency: (repo, range) =>
+    fetchJson(`${BASE_URL}/metrics/deploy-freq`, { repo, ...buildRange(range) }),
 
-  getLeadTime: (repo, days = 30) =>
-    fetchJson(`${BASE_URL}/metrics/lead-time`, { repo, days }),
+  getLeadTime: (repo, range) =>
+    fetchJson(`${BASE_URL}/metrics/lead-time`, { repo, ...buildRange(range) }),
 
-  getChangeFailRate: (repo, days = 30) =>
-    fetchJson(`${BASE_URL}/metrics/change-fail`, { repo, days }),
+  getChangeFailRate: (repo, range) =>
+    fetchJson(`${BASE_URL}/metrics/change-fail`, { repo, ...buildRange(range) }),
 
-  getMttr: (repo, days = 30) =>
-    fetchJson(`${BASE_URL}/metrics/mttr`, { repo, days }),
+  getMttr: (repo, range) =>
+    fetchJson(`${BASE_URL}/metrics/mttr`, { repo, ...buildRange(range) }),
 
-  getClaudeCode: (days = 30) =>
-    fetchJson(`${BASE_URL}/metrics/claude-code`, { days }),
+  getClaudeCode: (range) =>
+    fetchJson(`${BASE_URL}/metrics/claude-code`, buildRange(range)),
 
   getTimeline: (repo, days = 90) =>
     fetchJson(`${BASE_URL}/metrics/timeline`, { repo, days }),
 
-  getReviews: (repo, days = 30) =>
-    fetchJson(`${BASE_URL}/reviews`, { repo, days }),
+  getReviews: (repo, range) =>
+    fetchJson(`${BASE_URL}/reviews`, { repo, ...buildRange(range) }),
 
   getRepos: () =>
     fetchJson(`${BASE_URL}/repos`),
+
+  getSprints: () =>
+    fetchJson(`${BASE_URL}/sprints`),
+
+  getLevelHistory: (repo, weeks = 26) =>
+    fetchJson(`${BASE_URL}/metrics/level-history`, { repo, weeks }),
+
+  // Returns Markdown text directly (not JSON). Used by the retro export
+  // button to download a .md file. We bypass `fetchJson` here because the
+  // response isn't application/json.
+  getRetroMarkdown: async (repo, range, sprintLabel) => {
+    const url = new URL(`${BASE_URL}/reports/retro`, window.location.origin)
+    if (repo) url.searchParams.set('repo', repo)
+    if (range?.start) url.searchParams.set('start', range.start)
+    if (range?.end) url.searchParams.set('end', range.end)
+    if (range?.days) url.searchParams.set('days', range.days)
+    if (sprintLabel) url.searchParams.set('sprint_label', sprintLabel)
+    const resp = await fetch(url)
+    if (!resp.ok) throw new ApiError(`Retro export failed: HTTP ${resp.status}`, resp.status)
+    return resp.text()
+  },
 
   triggerCollection: () => {
     const key = getApiKey()

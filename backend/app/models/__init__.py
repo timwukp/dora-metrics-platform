@@ -7,6 +7,9 @@ from app.models.events import (
     Incident,
     ClaudeCodeSession,
     ReviewEvent,
+    DoraLevelSnapshot,
+    AlertRule,
+    AlertEvent,
 )
 
 __all__ = [
@@ -21,4 +24,7 @@ __all__ = [
     "Incident",
     "ClaudeCodeSession",
     "ReviewEvent",
+    "DoraLevelSnapshot",
+    "AlertRule",
+    "AlertEvent",
 ]

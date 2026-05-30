@@ -97,6 +97,7 @@ class Incident(Base):
     __table_args__ = (
         Index("ix_incident_repo_started_at", "repo", "started_at"),
         Index("ix_incident_resolved_at", "resolved_at"),
+        UniqueConstraint("source", "external_id", name="uq_incident_source_extid"),
     )
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
@@ -169,6 +170,85 @@ class OtelCumulativeState(Base):
     last_value = Column(Float, default=0.0)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(),
                         onupdate=func.now())
+
+
+class DoraLevelSnapshot(Base):
+    """Weekly DORA-level snapshot per repo (issue #16).
+
+    One row per (repo, metric, week_start). `metric` is one of
+    'deployment_frequency', 'lead_time_for_changes', 'change_failure_rate',
+    'mean_time_to_recovery'. `level` is the band string the calculator
+    returns ("Elite"/"High"/"Medium"/"Low"/"—"). `value` is the headline
+    number for that metric (deploys/day, hours, etc.) so the chart can
+    show both the level and the underlying trend.
+
+    `week_start` is the Monday 00:00 UTC of the ISO week — keeps boundaries
+    deterministic across timezones.
+    """
+    __tablename__ = "dora_level_snapshots"
+    __table_args__ = (
+        UniqueConstraint("repo", "metric", "week_start",
+                         name="uq_dora_level_snapshot"),
+    )
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    repo = Column(String(255), nullable=False, index=True)
+    metric = Column(String(40), nullable=False)
+    week_start = Column(DateTime(timezone=True), nullable=False, index=True)
+    level = Column(String(16), nullable=False)
+    value = Column(Float, nullable=True)
+    sample_size = Column(Integer, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class AlertRule(Base):
+    """Threshold rule for a DORA metric (issue #15).
+
+    Examples:
+        repo='octo/repo', metric='lead_time_for_changes', operator='>',
+        threshold=24.0, change_pct=50.0
+        => fire when lead time is >24h AND it's grown >=50% vs the prior
+           window of equal length.
+
+    `change_pct` is optional; when null, the rule fires on absolute
+    threshold alone. When set, BOTH conditions must be met to fire — this
+    avoids paging on a single noisy week.
+
+    The dispatcher records each fire in `alert_events` and de-dupes within
+    a 7-day window so a persistently-bad metric doesn't generate daily
+    pages.
+    """
+    __tablename__ = "alert_rules"
+    __table_args__ = (
+        UniqueConstraint("repo", "metric", name="uq_alert_rule_repo_metric"),
+    )
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    repo = Column(String(255), nullable=False, index=True)
+    metric = Column(String(40), nullable=False)
+    operator = Column(String(2), nullable=False)  # '>', '<', '>=', '<='
+    threshold = Column(Float, nullable=False)
+    change_pct = Column(Float, nullable=True)
+    channels = Column(String(64), default="slack")  # comma-separated
+    enabled = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class AlertEvent(Base):
+    """Audit log of fired alerts. Used both for the dashboard's history
+    view and for de-duplication."""
+    __tablename__ = "alert_events"
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    rule_id = Column(BigInteger, nullable=False, index=True)
+    fired_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    repo = Column(String(255), nullable=False)
+    metric = Column(String(40), nullable=False)
+    value = Column(Float, nullable=True)
+    prior_value = Column(Float, nullable=True)
+    change_pct = Column(Float, nullable=True)
+    channels_attempted = Column(String(64), default="")
+    delivery_status = Column(String(64), default="stub")  # 'stub'|'ok'|'failed'
+    detail = Column(Text, nullable=True)
 
 
 class WebhookDelivery(Base):

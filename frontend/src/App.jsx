@@ -1,22 +1,48 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useApi } from './hooks/useApi'
 import { api } from './services/api'
-import { ErrorBoundary } from './components/ErrorBoundary'
 import { DoraScoreCard } from './components/DoraScoreCard'
 import { TrendChart } from './components/TrendChart'
 import { ClaudeCodePanel } from './components/ClaudeCodePanel'
 import { ReviewPanel } from './components/ReviewPanel'
+import { LevelHistory } from './components/LevelHistory'
+import Compare from './pages/Compare'
+
+// Tiny hash-based router. Two pages — bringing in react-router for one
+// extra view would dwarf its bundle size.
+function useHashRoute() {
+  const [route, setRoute] = useState(() => window.location.hash.slice(1) || 'dashboard')
+  useEffect(() => {
+    const onChange = () => setRoute(window.location.hash.slice(1) || 'dashboard')
+    window.addEventListener('hashchange', onChange)
+    return () => window.removeEventListener('hashchange', onChange)
+  }, [])
+  return route
+}
 
 export default function App() {
+  const route = useHashRoute()
   const [days, setDays] = useState(30)
   const [repo, setRepo] = useState(null)
+  // null when "Last N days" is selected; an object {start, end, label}
+  // when a sprint is picked.
+  const [sprint, setSprint] = useState(null)
 
   const { data: repos, notReady: reposNotReady } = useApi(() => api.getRepos(), [])
+  const { data: sprints } = useApi(() => api.getSprints(), [])
+
+  const range = sprint
+    ? { start: sprint.start, end: sprint.end }
+    : { days }
+  // Stringify so useApi's dep array is stable across re-renders.
+  const rangeKey = JSON.stringify(range)
+
   const {
     data: dora, loading, error: doraError, notReady: doraNotReady,
-  } = useApi(() => api.getDoraSummary(repo, days), [repo, days])
+  } = useApi(() => api.getDoraSummary(repo, range), [repo, rangeKey])
   const { data: timeline } = useApi(() => api.getTimeline(repo, 90), [repo])
-  const { data: reviews } = useApi(() => api.getReviews(repo, days), [repo, days])
+  const { data: reviews } = useApi(() => api.getReviews(repo, range), [repo, rangeKey])
+  const { data: levelHistory } = useApi(() => api.getLevelHistory(repo, 26), [repo])
 
   const df = dora?.deployment_frequency
   const lt = dora?.lead_time_for_changes
@@ -32,7 +58,26 @@ export default function App() {
           <div>
             <h1 className="text-2xl font-bold">DORA Metrics Platform</h1>
             <p className="text-sm text-gray-400">Developer Performance & AI-Assisted Development</p>
+            <nav className="mt-2 flex gap-3 text-sm">
+              <a
+                href="#dashboard"
+                className={route === 'dashboard'
+                  ? 'text-white font-medium border-b-2 border-emerald-500 pb-0.5'
+                  : 'text-gray-400 hover:text-white'}
+              >
+                Dashboard
+              </a>
+              <a
+                href="#compare"
+                className={route === 'compare'
+                  ? 'text-white font-medium border-b-2 border-emerald-500 pb-0.5'
+                  : 'text-gray-400 hover:text-white'}
+              >
+                Compare
+              </a>
+            </nav>
           </div>
+          {route === 'dashboard' && (
           <div className="flex items-center gap-4">
             {repos && (
               <select
@@ -40,15 +85,35 @@ export default function App() {
                 onChange={(e) => setRepo(e.target.value || null)}
                 value={repo || ''}
               >
-                <option value="">All Repositories</option>
                 {repos.repos.map((r) => (
                   <option key={r} value={r}>{r}</option>
                 ))}
               </select>
             )}
+            {sprints?.configured && sprints.sprints?.length > 0 && (
+              <select
+                aria-label="Sprint selector"
+                className="bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm"
+                value={sprint ? `${sprint.start}|${sprint.end}` : ''}
+                onChange={(e) => {
+                  if (!e.target.value) { setSprint(null); return }
+                  const [start, end] = e.target.value.split('|')
+                  const match = sprints.sprints.find((s) => s.start === start && s.end === end)
+                  setSprint(match ? { start, end, label: match.label } : null)
+                }}
+              >
+                <option value="">Custom range</option>
+                {[...sprints.sprints].reverse().map((s) => (
+                  <option key={`${s.start}|${s.end}`} value={`${s.start}|${s.end}`}>
+                    {s.label}{s.is_current ? ' (current)' : ''}
+                  </option>
+                ))}
+              </select>
+            )}
             <select
-              className="bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm"
+              className="bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm disabled:opacity-50"
               value={days}
+              disabled={!!sprint}
               onChange={(e) => setDays(Number(e.target.value))}
             >
               <option value={7}>Last 7 days</option>
@@ -57,12 +122,39 @@ export default function App() {
               <option value={60}>Last 60 days</option>
               <option value={90}>Last 90 days</option>
             </select>
+            <button
+              type="button"
+              aria-label="Export retro report"
+              className="bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm hover:bg-gray-700"
+              onClick={async () => {
+                try {
+                  const md = await api.getRetroMarkdown(repo, range, sprint?.label)
+                  const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' })
+                  const url = URL.createObjectURL(blob)
+                  const a = document.createElement('a')
+                  a.href = url
+                  const tag = sprint?.label
+                    ? sprint.label.replace(/\s+/g, '-').toLowerCase()
+                    : `last-${days}-days`
+                  a.download = `dora-retro-${tag}.md`
+                  document.body.appendChild(a)
+                  a.click()
+                  a.remove()
+                  URL.revokeObjectURL(url)
+                } catch (e) {
+                  alert(`Export failed: ${e.message}`)
+                }
+              }}
+            >
+              Export retro
+            </button>
           </div>
+          )}
         </div>
       </header>
 
+      {route === 'compare' ? <Compare /> : (
       <main className="max-w-7xl mx-auto px-6 py-8 space-y-8">
-        <ErrorBoundary>
         {(doraNotReady || reposNotReady) && (
           <div className="rounded-md border border-yellow-700/50 bg-yellow-900/20 px-4 py-3 text-sm text-yellow-200">
             Backend is starting or its database isn’t ready yet. Retrying…
@@ -148,6 +240,9 @@ export default function App() {
               </section>
             )}
 
+            {/* DORA Level History */}
+            <LevelHistory data={levelHistory} />
+
             {/* Review Activity */}
             <ReviewPanel data={reviews} />
 
@@ -185,8 +280,8 @@ export default function App() {
             </section>
           </>
         )}
-        </ErrorBoundary>
       </main>
+      )}
 
       <footer className="border-t border-gray-800 px-6 py-4 text-center text-xs text-gray-500">
         DORA Metrics Platform v1.0 | Data sources: GitHub API, Claude Code Analytics API, CI/CD Workflows
