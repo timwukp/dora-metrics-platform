@@ -272,6 +272,22 @@ Repo 查詢參數會驗證是否在 `DORA_GITHUB_REPOS` 設定中 — 無法查�
 - Kubernetes：Pod Security Standard `restricted` 強制執行、NetworkPolicy 預設拒絕、External Secrets 來自 AWS Secrets Manager、ALB with TLS 1.3
 - Dependabot 每週更新 pip / npm / Docker / Actions
 
+## AI 輔助開發方法論
+
+這個 repo 將 AI 編碼 agent（Claude Code、Cursor、Codex、Aider 等）視為一等公民協作者。兩份精簡的方法論文件互相搭配，讓你不需要在每次新 session 重新解釋脈絡，也能讓新加入的人類貢獻者快速進入狀態：
+
+| 文件 | 涵蓋內容 |
+|---|---|
+| [`AGENTS.md`](AGENTS.md) | 本 repo 的不變約束（invariants）、部署拓撲、開發循環、文件索引。**入場必讀**。 |
+| [`docs/methodology/agent-onboarding.md`](docs/methodology/agent-onboarding.md) | **脈絡持久化（Context durability）**。一套 repo-agnostic 的模式，讓任何專案都能被 AI agent 讀懂 —— `AGENTS.md` 結構 + `discussion`-issue 模板（Working assumptions + Repo context）。 |
+| [`docs/methodology/change-discipline.md`](docs/methodology/change-discipline.md) | **變更紀律（Change discipline）**。5 步迴圈 DISCOVER → TRIAGE → GROUP → FIX → REVIEW、分支 / commit / PR 命名規範、反模式、以及 stacked-PR 例外場景。實作範例：phase 1–6 安裝摩擦修復 stack（PRs #34–#38，關閉 issues #23–#33）。 |
+
+兩份方法論**正交且互補**：agent-onboarding 確保 agent **理解** repo；change-discipline 確保 agent 用和人類同樣的紀律**落地變更**。兩者合起來構成完整的 agentic 開發套件。
+
+本 repo 的 GitHub 表單也強制執行這套紀律：見 [`.github/ISSUE_TEMPLATE/`](.github/ISSUE_TEMPLATE)（bug、enhancement、discussion 三個模板）以及 [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md)。
+
+**將這套模式套用到其他 repo：** 把兩份方法論檔案原樣複製過去，然後依照 `agent-onboarding.md` 開頭的 8-section 模板，撰寫該 repo 自己的 `AGENTS.md`。方法論文件刻意設計成 repo-agnostic，可直接重用。
+
 ## 專案結構
 
 ```

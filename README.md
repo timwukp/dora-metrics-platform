@@ -270,6 +270,33 @@ A short summary; see [SECURITY.md](SECURITY.md) for the full policy.
 - Kubernetes: Pod Security Standard `restricted` enforced, NetworkPolicy default-deny, External Secrets from AWS Secrets Manager, ALB with TLS 1.3
 - Dependabot weekly for pip / npm / Docker / Actions
 
+## Methodology for AI-assisted development
+
+This repo treats AI coding agents (Claude Code, Cursor, Codex, Aider, etc.)
+as first-class collaborators. Two short methodology documents, paired,
+make it possible to start a fresh agent session — or onboard a new
+contributor — without re-explaining context every time:
+
+| Document | What it covers |
+|---|---|
+| [`AGENTS.md`](AGENTS.md) | The repo's invariants, deployment topology, dev loop, and doc index. Read this on arrival. |
+| [`docs/methodology/agent-onboarding.md`](docs/methodology/agent-onboarding.md) | **Context durability.** A repo-agnostic pattern for making any project legible to AI agents — `AGENTS.md` structure + `discussion`-issue template (Working assumptions + Repo context). |
+| [`docs/methodology/change-discipline.md`](docs/methodology/change-discipline.md) | **Change discipline.** A 5-step DISCOVER → TRIAGE → GROUP → FIX → REVIEW loop, branch / commit / PR conventions, anti-patterns, and stacked-PR exception. Worked example: the phase 1–6 install-friction stack (PRs #34–#38, closing issues #23–#33). |
+
+The two are **orthogonal and complementary**: agent-onboarding makes
+sure agents *understand* the repo; change-discipline makes sure they
+*land changes* the same way humans do. Together they form a complete
+agentic dev kit.
+
+GitHub forms in this repo also enforce the discipline: see
+[`.github/ISSUE_TEMPLATE/`](.github/ISSUE_TEMPLATE) (bug, enhancement,
+discussion templates) and [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md).
+
+**To apply this pattern to another repo:** copy the two methodology
+docs verbatim, then write that repo's own `AGENTS.md` using the
+8-section template at the top of `agent-onboarding.md`. The
+methodology files are deliberately repo-agnostic.
+
 ## Project structure
 
 ```
