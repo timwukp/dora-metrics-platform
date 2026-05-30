@@ -96,6 +96,17 @@ Answers four questions about a team using a dashboard:
 
 It also surfaces **AI-assisted development** signals from Claude Code (sessions, accept/reject rate, lines of code, cost) so you can correlate AI usage with delivery metrics.
 
+### Beyond the four metrics
+
+The dashboard also includes:
+
+- **Sprint-aligned views** — pick a sprint window from a configured schedule (`DORA_SPRINT_SCHEDULE="<anchor-iso-date>:<length-days>"`); falls back to "Last N days" when unset.
+- **DORA regression alerts** — define rules per repo/metric; the daily evaluator fires when a threshold is breached AND (optionally) the metric moved by `change_pct` vs. the prior equal-length window. Slack and email channels with stub-mode default. 7-day dedup window.
+- **Weekly DORA level snapshots** — a heatmap showing how each metric's level (Elite / High / Medium / Low) drifted over the last 26 weeks. Snapshots are idempotent per `(repo, metric, week_start)` and self-heal if a daily run was missed.
+- **Incident webhook receivers** — PagerDuty and OpsGenie post incident lifecycle events (HMAC-SHA256 verified, replay-safe). MTTR is then computed from real `triggered → resolved` timestamps instead of hotfix-PR proxies.
+- **Retro markdown export** — one-click download of `dora-retro-<window>.md` with headline metrics, breakdown, and rule-based discussion suggestions (high CFR, review-dominated lead time, etc.).
+- **Compare across teams** — direction-only trend arrows (↑/↓/→) for every configured repo, designed to surface _shared bottlenecks_ rather than rank teams.
+
 ## Architecture
 
 ```
@@ -192,13 +203,34 @@ All `GET /api/v1/metrics/*` are public read-only. Mutating endpoints require `X-
 | `GET /api/v1/metrics/dora` | none |
 | `GET /api/v1/metrics/{deploy-freq,lead-time,change-fail,mttr,timeline}` | none |
 | `GET /api/v1/metrics/claude-code` | none |
+| `GET /api/v1/metrics/level-history` | none |
 | `GET /api/v1/reviews` | none |
 | `GET /api/v1/repos` | none |
+| `GET /api/v1/sprints` | none |
+| `GET /api/v1/reports/retro` | none |
+| `GET /api/v1/alerts/rules` / `/alerts/events` | none |
 | `POST /api/v1/collect/github` | `X-API-Key` |
 | `POST /api/v1/collect/claude-code` | `X-API-Key` |
+| `POST /api/v1/collect/level-snapshots` | `X-API-Key` |
+| `POST /api/v1/alerts/rules` / `DELETE /alerts/rules/{id}` | `X-API-Key` |
+| `POST /api/v1/alerts/evaluate` | `X-API-Key` |
 | `POST /api/v1/webhooks/github` | `X-Hub-Signature-256` HMAC |
+| `POST /api/v1/webhooks/pagerduty` | `X-PagerDuty-Signature` HMAC (optional) |
+| `POST /api/v1/webhooks/opsgenie` | `X-OpsGenie-Token` (optional) |
 
 Repo query params are validated against `DORA_GITHUB_REPOS` — you cannot query repos this server isn't configured for.
+
+### Configuration for the new features
+
+| Setting | Purpose | Default |
+|---------|---------|---------|
+| `DORA_SPRINT_SCHEDULE` | `<anchor-iso-date>:<length-days>` (e.g. `2026-01-06:14`). Empty hides the sprint selector. | unset |
+| `DORA_ALERTS_ENABLED` | Master switch for the alert dispatcher. When `false`, channels stub-log instead of sending. | `false` |
+| `DORA_ALERTS_SLACK_WEBHOOK` | Slack incoming-webhook URL. | unset |
+| `DORA_ALERTS_EMAIL_TO` / `DORA_ALERTS_SMTP` | Email recipients + `host:port`. SMTP delivery is a hook in trial mode. | unset |
+| `DORA_PAGERDUTY_WEBHOOK_SECRET` | HMAC secret for V3 webhook subscription. Unset = accept unsigned (dev only). | unset |
+| `DORA_OPSGENIE_WEBHOOK_SECRET` | Token compared against `X-OpsGenie-Token`. | unset |
+| `DORA_INCIDENT_DEFAULT_REPO` | Repo to attribute incidents to when payload lacks a service→repo mapping. | first configured repo |
 
 ## Security
 

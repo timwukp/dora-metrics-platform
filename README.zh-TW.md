@@ -98,6 +98,17 @@ DORA 指標和 Scrum 天然互補。Scrum 提供了固定節奏的迭代框架�
 
 同時呈現 **AI 輔助開發**的信號（來自 Claude Code），包括 session 數、接受/拒絕率、代碼行數、成本，讓你能關聯 AI 使用量與交付指標。
 
+### 四個指標之外的延伸功能
+
+Dashboard 還提供：
+
+- **Sprint 對齊視圖** — 透過設定 `DORA_SPRINT_SCHEDULE="<起始日期>:<sprint 天數>"` 啟用 sprint 選單；未設定時退回「最近 N 天」。
+- **DORA 退步告警** — 為每個 repo / 指標定義規則；每天的評估器會在閾值被突破，且（選配）相對於前一個等長視窗變動超過 `change_pct` 時觸發。Slack、Email channel 預設為 stub 模式。內建 7 天去重視窗，避免疲勞轟炸。
+- **每週 DORA 等級快照** — 用 heatmap 呈現過去 26 週每個指標的等級（Elite / High / Medium / Low）漂移。每筆快照以 `(repo, metric, week_start)` 為唯一鍵冪等寫入，若某天的排程跳過會自動補回。
+- **事件管理 webhook 接收器** — PagerDuty 與 OpsGenie 推送事件生命週期事件（HMAC-SHA256 驗章、防重放）。MTTR 改用真實的 `triggered → resolved` 時間戳，不再倚賴 hotfix PR 的近似值。
+- **Retro markdown 匯出** — 一鍵下載 `dora-retro-<時間區間>.md`，包含主要指標、分解資訊、以及規則化的討論建議（高 CFR、review 主導 lead time 等）。
+- **跨團隊比對頁** — 為每個設定的 repo 顯示方向性箭頭（↑/↓/→），目的是發現**共同瓶頸**，而不是排名團隊。
+
 ## 系統架構
 
 ```
@@ -194,13 +205,34 @@ kubectl apply -k infra/k8s
 | `GET /api/v1/metrics/dora` | 無 |
 | `GET /api/v1/metrics/{deploy-freq,lead-time,change-fail,mttr,timeline}` | 無 |
 | `GET /api/v1/metrics/claude-code` | 無 |
+| `GET /api/v1/metrics/level-history` | 無 |
 | `GET /api/v1/reviews` | 無 |
 | `GET /api/v1/repos` | 無 |
+| `GET /api/v1/sprints` | 無 |
+| `GET /api/v1/reports/retro` | 無 |
+| `GET /api/v1/alerts/rules` / `/alerts/events` | 無 |
 | `POST /api/v1/collect/github` | `X-API-Key` |
 | `POST /api/v1/collect/claude-code` | `X-API-Key` |
+| `POST /api/v1/collect/level-snapshots` | `X-API-Key` |
+| `POST /api/v1/alerts/rules` / `DELETE /alerts/rules/{id}` | `X-API-Key` |
+| `POST /api/v1/alerts/evaluate` | `X-API-Key` |
 | `POST /api/v1/webhooks/github` | `X-Hub-Signature-256` HMAC |
+| `POST /api/v1/webhooks/pagerduty` | `X-PagerDuty-Signature` HMAC（選配） |
+| `POST /api/v1/webhooks/opsgenie` | `X-OpsGenie-Token`（選配） |
 
 Repo 查詢參數會驗證是否在 `DORA_GITHUB_REPOS` 設定中 — 無法查詢未設定追蹤的 repo。
+
+### 新功能對應的設定項
+
+| 設定 | 用途 | 預設值 |
+|------|------|--------|
+| `DORA_SPRINT_SCHEDULE` | `<起始日期>:<sprint 天數>`（例：`2026-01-06:14`）。未設定時隱藏 sprint 選單。 | 未設定 |
+| `DORA_ALERTS_ENABLED` | 告警分派的總開關。`false` 時 channel 只 stub-log，不真的送出。 | `false` |
+| `DORA_ALERTS_SLACK_WEBHOOK` | Slack incoming-webhook URL。 | 未設定 |
+| `DORA_ALERTS_EMAIL_TO` / `DORA_ALERTS_SMTP` | Email 收件人 + `host:port`。trial 模式下 SMTP 寄送是預留 hook。 | 未設定 |
+| `DORA_PAGERDUTY_WEBHOOK_SECRET` | PagerDuty V3 webhook 訂閱用的 HMAC secret。未設定 = 接受未簽章請求（僅供開發）。 | 未設定 |
+| `DORA_OPSGENIE_WEBHOOK_SECRET` | 用來比對 `X-OpsGenie-Token` 的 token。 | 未設定 |
+| `DORA_INCIDENT_DEFAULT_REPO` | 當 webhook payload 缺少 service→repo 對應時，事件歸屬的 repo。 | 第一個設定的 repo |
 
 ## 安全性
 
