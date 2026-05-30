@@ -157,19 +157,44 @@ cd frontend && npm ci && npm run dev
 
 See [docs/EKS-DEPLOY.md](docs/EKS-DEPLOY.md) for the full secure deployment runbook (RDS, IRSA, External Secrets, ALB+ACM, WAF, NetworkPolicy).
 
-Short version:
+### Prerequisites
+
+The shipped manifests assume these are installed in your cluster:
 
 ```bash
-# Build & push
-aws ecr create-repository --repository-name dora-backend
-aws ecr create-repository --repository-name dora-frontend
-docker build -f infra/docker/Dockerfile.backend  -t $ECR/dora-backend:$TAG .
-docker build -f infra/docker/Dockerfile.frontend -t $ECR/dora-frontend:$TAG .
-docker push $ECR/dora-backend:$TAG && docker push $ECR/dora-frontend:$TAG
+# AWS Load Balancer Controller (for the Ingress)
+helm repo add eks https://aws.github.io/eks-charts
+helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
+  -n kube-system --set clusterName=$CLUSTER
 
-# Deploy (after substituting env vars in manifests)
-kubectl apply -k infra/k8s
+# External Secrets Operator (for AWS Secrets Manager → K8s Secret sync)
+helm repo add external-secrets https://charts.external-secrets.io
+helm install external-secrets external-secrets/external-secrets \
+  -n external-secrets --create-namespace
 ```
+
+Plus a CNI that enforces NetworkPolicy (Calico, Cilium, or VPC CNI in policy mode).
+**EKS Fargate-only clusters do NOT enforce NetworkPolicy** — see [docs/EKS-DEPLOY.md](docs/EKS-DEPLOY.md#fargate-clusters).
+
+### Short version
+
+```bash
+# 1. Build & push (linux/amd64 required for Fargate; Apple Silicon defaults to arm64)
+export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+export AWS_REGION=us-east-1
+export TAG=$(git rev-parse --short HEAD)
+./scripts/build-and-push.sh
+
+# 2. Render manifests (envsubst + fail-loud on unresolved REPLACE_* placeholders)
+export IMAGE_TAG=$TAG
+./scripts/render-manifests.sh
+
+# 3. Apply
+kubectl apply -f build/k8s/
+```
+
+For a minimal **trial-mode** deployment without ALB/ACM/WAF (port-forward only),
+see [docs/EKS-DEPLOY.md → Trial mode](docs/EKS-DEPLOY.md#trial-mode-port-forward-only).
 
 ## DORA metric sources
 

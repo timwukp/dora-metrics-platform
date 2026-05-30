@@ -24,6 +24,10 @@ jobs:
           frameworks: nsa,mitre,armobest
           format: sarif
           outputFile: kubescape.sarif
+          # Exempts C-0237 (image signature) for the dora-metrics namespace
+          # only. Image signing belongs in the CD pipeline; the placeholder
+          # tags shipped in this repo aren't cosign-signed by design.
+          exceptions: infra/k8s/kubescape-exceptions.json
           # Only fail on Critical/High severity misconfigurations.
           # Medium findings are reported but don't break the build.
           failedThreshold: 8

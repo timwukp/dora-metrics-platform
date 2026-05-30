@@ -1,6 +1,17 @@
 # Default-deny all ingress and egress in the namespace, then explicitly allow
 # only the flows we need. Requires a CNI that enforces NetworkPolicy
 # (Calico, Cilium, or AWS VPC CNI with NetworkPolicy enabled).
+#
+# IMPORTANT: ports below refer to the **pod port** the policy matches against,
+# NOT the Service port. Services map their port to a target pod port:
+#   - dora-frontend Service: port 80 → pod port 8080 (nginx)
+#   - dora-backend  Service: port 80 → pod port 8000 (uvicorn)
+# When debugging with `kubectl port-forward svc/...` the Service port is what
+# the local host binds to, but NetworkPolicy is evaluated at the pod port.
+#
+# EKS Fargate caveat: NetworkPolicy is NOT enforced on Fargate-only clusters
+# (Fargate has no DaemonSet-capable CNI). These policies will apply but be
+# silently no-op. See docs/EKS-DEPLOY.md "Fargate clusters" section.
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -25,12 +36,12 @@ spec:
     - from:
         - namespaceSelector:
             matchLabels: { kubernetes.io/metadata.name: kube-system }
-      ports: [{ protocol: TCP, port: 8080 }]
+      ports: [{ protocol: TCP, port: 8080 }]   # frontend pod port (nginx)
   egress:
     - to:
         - podSelector:
             matchLabels: { app: dora-backend }
-      ports: [{ protocol: TCP, port: 8000 }]
+      ports: [{ protocol: TCP, port: 8000 }]   # backend pod port (uvicorn)
     - to:
         - namespaceSelector: {}
           podSelector:

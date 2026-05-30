@@ -1,0 +1,16 @@
+[
+  {
+    "name": "image-signature-out-of-scope",
+    "policyType": "postureExceptionPolicy",
+    "actions": ["alertOnly"],
+    "resources": [
+      {
+        "designatorType": "Attributes",
+        "attributes": { "namespace": "dora-metrics" }
+      }
+    ],
+    "posturePolicies": [
+      { "controlID": "C-0237" }
+    ]
+  }
+]

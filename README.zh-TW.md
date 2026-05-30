@@ -159,19 +159,44 @@ cd frontend && npm ci && npm run dev
 
 參閱 [docs/EKS-DEPLOY.md](docs/EKS-DEPLOY.md) 取得完整的安全部署指南（RDS、IRSA、External Secrets、ALB+ACM、WAF、NetworkPolicy）。
 
-簡短版本：
+### 前置條件
+
+manifests 假設叢集已安裝以下元件：
 
 ```bash
-# 建置並推送映像
-aws ecr create-repository --repository-name dora-backend
-aws ecr create-repository --repository-name dora-frontend
-docker build -f infra/docker/Dockerfile.backend  -t $ECR/dora-backend:$TAG .
-docker build -f infra/docker/Dockerfile.frontend -t $ECR/dora-frontend:$TAG .
-docker push $ECR/dora-backend:$TAG && docker push $ECR/dora-frontend:$TAG
+# AWS Load Balancer Controller（給 Ingress 用）
+helm repo add eks https://aws.github.io/eks-charts
+helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
+  -n kube-system --set clusterName=$CLUSTER
 
-# 部署（先替換 manifests 中的環境變數）
-kubectl apply -k infra/k8s
+# External Secrets Operator（把 AWS Secrets Manager 的 secret 同步到 K8s Secret）
+helm repo add external-secrets https://charts.external-secrets.io
+helm install external-secrets external-secrets/external-secrets \
+  -n external-secrets --create-namespace
 ```
+
+外加一個能執行 NetworkPolicy 的 CNI（Calico、Cilium，或 policy mode 的 VPC CNI）。
+**EKS Fargate-only 叢集不支援 NetworkPolicy** — 詳見 [docs/EKS-DEPLOY.md](docs/EKS-DEPLOY.md#fargate-clusters)。
+
+### 簡短版本
+
+```bash
+# 1. 建置並推送映像（Fargate 需要 linux/amd64；Apple Silicon 預設會是 arm64）
+export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+export AWS_REGION=us-east-1
+export TAG=$(git rev-parse --short HEAD)
+./scripts/build-and-push.sh
+
+# 2. 渲染 manifests（envsubst + 偵測未替換的 REPLACE_* 佔位符）
+export IMAGE_TAG=$TAG
+./scripts/render-manifests.sh
+
+# 3. 套用
+kubectl apply -f build/k8s/
+```
+
+只想做最小驗證（port-forward、不開 ALB/ACM/WAF）的 **trial 模式**，
+請見 [docs/EKS-DEPLOY.md → Trial mode](docs/EKS-DEPLOY.md#trial-mode-port-forward-only)。
 
 ## DORA 指標資料來源
 
