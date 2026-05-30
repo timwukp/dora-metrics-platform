@@ -195,6 +195,49 @@ The dashboard should be reachable at `https://dora.example.com/`.
 
 ---
 
+## Schema migrations (Alembic)
+
+The schema is owned by Alembic. The base kustomization includes a
+`dora-migrate` Job that runs `alembic upgrade head` against
+`DORA_DATABASE_URL` from the `dora-secrets` Secret; the backend Deployment
+is deliberately **not** ordered after the Job because both are applied in
+the same overlay — the backend's lifespan refuses to start until the DB is
+at head, so the rolling pods will simply CrashLoop until the Job finishes
+(typically a few seconds for the initial migration).
+
+### Trial mode
+
+`DORA_AUTO_MIGRATE=true` is set in the trial overlay (effectively
+"`alembic upgrade head` at process start"). This is fine for trial because
+there is exactly one backend pod.
+
+### Production
+
+The migrate Job runs once per release. To re-run on every deploy, the CD
+pipeline should suffix the Job name with the image tag:
+
+```yaml
+# kustomize/overlays/production/kustomization.yaml
+nameSuffix: -${IMAGE_TAG}    # via render-manifests.sh
+```
+
+…or `kubectl delete job dora-migrate -n dora-metrics` before re-applying.
+
+### Upgrading from pre-Alembic deployments
+
+If you deployed before this change (i.e. tables were created by the old
+`Base.metadata.create_all()` lifespan), `alembic upgrade head` will fail
+with `DuplicateTable`. Run **once**:
+
+```bash
+kubectl -n dora-metrics exec deploy/dora-backend -- \
+  alembic stamp head
+```
+
+…then redeploy normally.
+
+---
+
 ## Fargate clusters
 
 EKS Fargate does **not** enforce NetworkPolicy. The shipped `networkpolicy.yaml`
