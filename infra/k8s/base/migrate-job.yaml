@@ -1,0 +1,50 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: dora-migrate
+  namespace: dora-metrics
+  labels: { app: dora-migrate }
+  annotations:
+    # Re-applying with the same name is a no-op once the Job has succeeded.
+    # CD pipelines that need a fresh run on every release should suffix the
+    # name with the image tag (kustomize `nameSuffix` per release) or delete
+    # the Job before re-applying.
+    description: "Runs `alembic upgrade head` before the dora-backend Deployment becomes ready."
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels: { app: dora-migrate }
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: dora-backend
+      automountServiceAccountToken: true
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: migrate
+          # Same image as dora-backend — overlays pin via kustomize images:.
+          image: dora-backend:placeholder
+          imagePullPolicy: IfNotPresent
+          workingDir: /app
+          command: ["alembic", "upgrade", "head"]
+          envFrom:
+            - secretRef: { name: dora-secrets }
+          resources:
+            requests: { cpu: "100m", memory: "128Mi" }
+            limits:   { cpu: "500m", memory: "256Mi" }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 10001
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - { name: tmp, emptyDir: { medium: Memory, sizeLimit: 32Mi } }

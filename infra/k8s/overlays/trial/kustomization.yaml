@@ -31,6 +31,9 @@ patches:
       - op: replace
         path: /spec/replicas
         value: 1
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value: { name: DORA_AUTO_MIGRATE, value: "true" }
   - target: { kind: Deployment, name: dora-frontend }
     patch: |-
       - op: replace

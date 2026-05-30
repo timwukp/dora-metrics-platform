@@ -13,5 +13,6 @@ resources:
   - namespace.yaml
   - serviceaccounts.yaml
   - networkpolicy.yaml
+  - migrate-job.yaml
   - backend.yaml
   - frontend.yaml

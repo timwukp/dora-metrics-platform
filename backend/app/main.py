@@ -35,7 +35,7 @@ from app.api.routes import router
 from app.collectors.claude_code_collector import ClaudeCodeCollector
 from app.collectors.github_collector import GitHubCollector
 from app.config.settings import settings
-from app.models.database import Base, SessionLocal, engine
+from app.models.database import SessionLocal, engine
 from app.services.leader import leader_lock
 
 logging.basicConfig(
@@ -119,9 +119,47 @@ async def scheduled_claude_code_collection():
             db.close()
 
 
+def _check_or_apply_migrations() -> None:
+    """Schema is owned by Alembic. If `DORA_AUTO_MIGRATE` is true we run
+    `alembic upgrade head` here (convenient for trial mode). Otherwise we
+    just warn — production should run the dedicated migrate Job before the
+    Deployment becomes ready."""
+    from alembic import command
+    from alembic.config import Config
+    from alembic.runtime.migration import MigrationContext
+    import os
+
+    cfg = Config(os.path.join(os.path.dirname(__file__), "..", "alembic.ini"))
+    cfg.set_main_option("script_location",
+                        os.path.join(os.path.dirname(__file__), "..", "alembic"))
+    cfg.set_main_option("sqlalchemy.url", settings.database_url)
+
+    if engine.url.drivername.startswith("sqlite"):
+        # Unit tests use Base.metadata.create_all on an in-memory SQLite
+        # engine; Alembic isn't in that path. Production runs Postgres.
+        logger.debug("SQLite engine detected; skipping Alembic revision check")
+        return
+
+    if os.environ.get("DORA_AUTO_MIGRATE", "").lower() in ("1", "true", "yes"):
+        logger.info("DORA_AUTO_MIGRATE=true → running alembic upgrade head")
+        command.upgrade(cfg, "head")
+        return
+
+    with engine.connect() as conn:
+        ctx = MigrationContext.configure(conn)
+        rev = ctx.get_current_revision()
+    if rev is None:
+        logger.error(
+            "Database has no Alembic revision applied. Run "
+            "`alembic upgrade head` (or set DORA_AUTO_MIGRATE=true) before "
+            "starting the backend.")
+        raise RuntimeError("schema not migrated")
+    logger.info("Alembic head detected at revision %s", rev)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    Base.metadata.create_all(bind=engine)
+    _check_or_apply_migrations()
     scheduler.add_job(
         scheduled_github_collection, "interval",
         minutes=settings.poll_interval_minutes, id="github_collection",
