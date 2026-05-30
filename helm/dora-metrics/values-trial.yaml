@@ -1,0 +1,32 @@
+# Trial preset — port-forward only, in-cluster Postgres, 1 replica each.
+#
+# Usage:
+#   helm install dora ./helm/dora-metrics \
+#     -f ./helm/dora-metrics/values-trial.yaml \
+#     --set image.backend.tag=fb-... \
+#     --set image.frontend.tag=ff-...
+#
+# Or run scripts/trial-bootstrap.sh first to create dora-secrets, then
+# this chart with --set secret.create=false.
+
+mode: trial
+
+backend:
+  replicaCount: 1
+  autoMigrate: true
+
+frontend:
+  replicaCount: 1
+
+postgres:
+  enabled: true
+
+ingress:
+  enabled: false
+
+externalSecrets:
+  enabled: false
+
+secret:
+  # Expects scripts/trial-bootstrap.sh to have created dora-secrets.
+  create: false

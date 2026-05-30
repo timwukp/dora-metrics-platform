@@ -1,0 +1,95 @@
+# Default values for dora-metrics. Two presets live under values-trial.yaml
+# and values-production.yaml in this directory; this file is the union
+# (intended to be overridden, not used directly).
+
+# `mode` switches the conditionals in the templates. Valid: "trial" | "production".
+# Trial:      includes Postgres StatefulSet, no Ingress, no ExternalSecrets, 1 replica.
+# Production: no Postgres (use RDS via DORA_DATABASE_URL), ALB Ingress, ESO + IRSA.
+mode: trial
+
+namespace:
+  # The chart can either create the namespace (PSS-restricted labels included)
+  # or expect it to exist. `helm install --create-namespace` creates it without
+  # the labels, so prefer create=true here.
+  create: true
+  # Empty → uses --namespace from helm install. Set explicitly to override.
+  name: ""
+
+image:
+  backend:
+    repository: dora-backend
+    tag: placeholder
+    pullPolicy: IfNotPresent
+  frontend:
+    repository: dora-frontend
+    tag: placeholder
+    pullPolicy: IfNotPresent
+
+backend:
+  replicaCount: 2
+  resources:
+    requests: { cpu: "250m", memory: "256Mi" }
+    limits:   { cpu: "1",    memory: "512Mi" }
+  env:
+    DORA_GITHUB_REPOS: "owner/repo"
+    DORA_POLL_INTERVAL_MINUTES: "15"
+    DORA_CORS_ORIGINS: "http://localhost:3000"
+    DORA_LOG_LEVEL: "INFO"
+  # Set to true in trial values; false in production where the migrate Job
+  # is the source of truth.
+  autoMigrate: false
+  # Add eks.amazonaws.com/role-arn IRSA annotation to the dora-backend
+  # ServiceAccount when set (production only).
+  irsaRoleArn: ""
+
+frontend:
+  replicaCount: 2
+  resources:
+    requests: { cpu: "100m", memory: "128Mi" }
+    limits:   { cpu: "500m", memory: "256Mi" }
+
+migrateJob:
+  # Set false to skip the dora-migrate Job (e.g. an existing deployment
+  # that's already on Alembic head).
+  enabled: true
+
+postgres:
+  # Trial only — production sets enabled=false and points
+  # DORA_DATABASE_URL at RDS via Secrets Manager.
+  enabled: true
+  image: postgres:16-alpine
+  # `persistence: emptyDir` is the only mode supported on EKS Fargate
+  # (Fargate refuses pods with PVC volumes). Use `pvc` on EC2-backed
+  # node groups; data survives pod restarts but not StatefulSet
+  # recreation. For real durability, switch to RDS via the production
+  # preset.
+  persistence: emptyDir   # emptyDir | pvc
+  storageSize: 20Gi
+  storageClassName: gp3
+
+ingress:
+  # Production only.
+  enabled: false
+  host: ""
+  certificateArn: ""
+  # Optional WAFv2 ACL ARN.
+  wafAclArn: ""
+
+externalSecrets:
+  # Production only — provisions a SecretStore + ExternalSecret
+  # backed by AWS Secrets Manager.
+  enabled: false
+  region: us-east-1
+  secretArn: ""
+  refreshInterval: "1h"
+
+# Trial users skip this and create the Secret out-of-band via
+# scripts/trial-bootstrap.sh, then disable .secret.create.
+secret:
+  create: false
+  values:
+    DORA_DATABASE_URL: ""
+    DORA_GITHUB_TOKEN: ""
+    DORA_GITHUB_WEBHOOK_SECRET: ""
+    DORA_API_KEY: ""
+    POSTGRES_PASSWORD: ""

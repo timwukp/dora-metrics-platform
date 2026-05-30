@@ -1,0 +1,52 @@
+{{- if .Values.migrateJob.enabled }}
+{{- /*
+The Job name carries the image tag so that `helm upgrade` with a new
+image creates a new Job instead of trying to mutate the immutable spec
+of the previous one. Old Jobs are GC'd via ttlSecondsAfterFinished.
+*/ -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ printf "dora-migrate-%s" .Values.image.backend.tag | trunc 63 | trimSuffix "-" }}
+  namespace: {{ include "dora.namespace" . }}
+  labels:
+    {{- include "dora.labels" . | nindent 4 }}
+    app: dora-migrate
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels: { app: dora-migrate }
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: dora-backend
+      automountServiceAccountToken: true
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: migrate
+          image: {{ include "dora.backend.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.backend.pullPolicy }}
+          workingDir: /app
+          command: ["alembic", "upgrade", "head"]
+          envFrom:
+            - secretRef: { name: dora-secrets }
+          resources:
+            requests: { cpu: "100m", memory: "128Mi" }
+            limits:   { cpu: "500m", memory: "256Mi" }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 10001
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - { name: tmp, emptyDir: { medium: Memory, sizeLimit: 32Mi } }
+{{- end }}

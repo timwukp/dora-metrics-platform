@@ -1,0 +1,38 @@
+# Production preset — ALB Ingress + External Secrets Operator + IRSA.
+# No in-cluster Postgres (expects RDS via DORA_DATABASE_URL in the
+# Secrets Manager secret).
+#
+# Usage:
+#   helm install dora ./helm/dora-metrics \
+#     -f ./helm/dora-metrics/values-production.yaml \
+#     --set image.backend.repository=$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/dora-backend \
+#     --set image.backend.tag=fb-... \
+#     --set image.frontend.repository=$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/dora-frontend \
+#     --set image.frontend.tag=ff-... \
+#     --set ingress.host=dora.example.com \
+#     --set ingress.certificateArn=arn:aws:acm:... \
+#     --set externalSecrets.region=us-east-1 \
+#     --set externalSecrets.secretArn=arn:aws:secretsmanager:... \
+#     --set backend.irsaRoleArn=arn:aws:iam::ACCOUNT:role/dora-backend-irsa
+
+mode: production
+
+backend:
+  replicaCount: 2
+  autoMigrate: false
+
+frontend:
+  replicaCount: 2
+
+postgres:
+  enabled: false
+
+ingress:
+  enabled: true
+
+externalSecrets:
+  enabled: true
+
+secret:
+  # ExternalSecret reconciles the Secret from AWS Secrets Manager.
+  create: false

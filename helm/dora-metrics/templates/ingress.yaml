@@ -1,0 +1,43 @@
+{{- if .Values.ingress.enabled }}
+{{- if not .Values.ingress.host }}
+{{- fail "ingress.enabled=true but ingress.host is empty" }}
+{{- end }}
+{{- if not .Values.ingress.certificateArn }}
+{{- fail "ingress.enabled=true but ingress.certificateArn is empty" }}
+{{- end }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dora-ingress
+  namespace: {{ include "dora.namespace" . }}
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+    alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS13-1-2-2021-06
+    alb.ingress.kubernetes.io/certificate-arn: {{ .Values.ingress.certificateArn | quote }}
+    {{- if .Values.ingress.wafAclArn }}
+    alb.ingress.kubernetes.io/wafv2-acl-arn: {{ .Values.ingress.wafAclArn | quote }}
+    {{- end }}
+    alb.ingress.kubernetes.io/healthcheck-path: /healthz
+    alb.ingress.kubernetes.io/load-balancer-attributes: routing.http.drop_invalid_header_fields.enabled=true,routing.http.xff_header_processing.mode=append
+spec:
+  ingressClassName: alb
+  rules:
+    - host: {{ .Values.ingress.host | quote }}
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: dora-backend
+                port: { name: http }
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: dora-frontend
+                port: { name: http }
+{{- end }}

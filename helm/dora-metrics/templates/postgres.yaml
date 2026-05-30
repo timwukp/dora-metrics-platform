@@ -1,0 +1,97 @@
+{{- if .Values.postgres.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: {{ include "dora.namespace" . }}
+  labels:
+    {{- include "dora.labels" . | nindent 4 }}
+    app: postgres
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels: { app: postgres }
+  template:
+    metadata:
+      labels: { app: postgres }
+    spec:
+      serviceAccountName: postgres
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 70
+        runAsGroup: 70
+        fsGroup: 70
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: postgres
+          image: {{ .Values.postgres.image | quote }}
+          ports:
+            - { name: pg, containerPort: 5432 }
+          env:
+            - { name: POSTGRES_DB,   value: dora_metrics }
+            - { name: POSTGRES_USER, value: dora }
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: dora-secrets, key: POSTGRES_PASSWORD }
+            - { name: PGDATA, value: /var/lib/postgresql/data/pgdata }
+          args:
+            - "-c"
+            - "ssl=off"
+            - "-c"
+            - "log_connections=on"
+            - "-c"
+            - "log_disconnections=on"
+          resources:
+            requests: { cpu: "250m", memory: "256Mi" }
+            limits:   { cpu: "1",    memory: "1Gi" }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 70
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/postgresql/data }
+            - { name: run,  mountPath: /var/run/postgresql }
+            - { name: tmp,  mountPath: /tmp }
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "dora", "-d", "dora_metrics"]
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "dora", "-d", "dora_metrics"]
+            initialDelaySeconds: 30
+            periodSeconds: 30
+      volumes:
+        - { name: run, emptyDir: {} }
+        - { name: tmp, emptyDir: {} }
+        {{- if eq .Values.postgres.persistence "emptyDir" }}
+        # Fargate-compatible (no PVCs). Data is lost on pod restart.
+        - name: data
+          emptyDir: { sizeLimit: {{ .Values.postgres.storageSize | quote }} }
+        {{- end }}
+      {{- if eq .Values.postgres.persistence "pvc" }}
+  volumeClaimTemplates:
+    - metadata: { name: data }
+      spec:
+        accessModes: [ReadWriteOnce]
+        storageClassName: {{ .Values.postgres.storageClassName | quote }}
+        resources:
+          requests:
+            storage: {{ .Values.postgres.storageSize | quote }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: {{ include "dora.namespace" . }}
+spec:
+  selector: { app: postgres }
+  ports:
+    - { port: 5432, targetPort: pg }
+  clusterIP: None
+{{- end }}
