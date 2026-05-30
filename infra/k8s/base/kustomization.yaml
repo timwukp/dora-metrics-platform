@@ -1,0 +1,17 @@
+# Base kustomization — common resources used by every overlay.
+#
+# - Does NOT include postgres.yaml (overlays opt-in: trial includes it,
+#   production excludes it and expects RDS via DORA_DATABASE_URL)
+# - Does NOT include ingress.yaml (production-only)
+# - Does NOT include external-secrets.yaml (production-only)
+#
+# DO NOT `kubectl apply -k base/` directly — apply an overlay.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: dora-metrics
+resources:
+  - namespace.yaml
+  - serviceaccounts.yaml
+  - networkpolicy.yaml
+  - backend.yaml
+  - frontend.yaml

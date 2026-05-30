@@ -25,7 +25,7 @@ spec:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: frontend
-          image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/dora-frontend:${IMAGE_TAG}
+          image: dora-frontend:placeholder
           imagePullPolicy: IfNotPresent
           ports:
             - { name: http, containerPort: 8080 }

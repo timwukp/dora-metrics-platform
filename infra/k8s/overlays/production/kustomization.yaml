@@ -1,0 +1,39 @@
+# Production overlay — RDS-only, ALB ingress, External Secrets Operator.
+#
+# Postgres StatefulSet is intentionally NOT included; expects DORA_DATABASE_URL
+# in the AWS Secrets Manager secret to point at RDS.
+#
+# Deploy:
+#   ./scripts/build-and-push.sh
+#   AWS_ACCOUNT_ID=... AWS_REGION=... IMAGE_TAG=... \
+#     ./scripts/render-manifests.sh \
+#       SRC_DIR=infra/k8s/overlays/production \
+#       OUT_DIR=build/k8s-production
+#   kubectl apply -k build/k8s-production    # OR apply rendered files individually
+#
+# Or with native kustomize replacements (no envsubst — see below).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+  - external-secrets.yaml
+  - ingress.yaml
+
+# Image pinning — overlays can specify the real ECR ARN here, or they can be
+# left as `dora-{backend,frontend}:placeholder` and rendered with
+# `kustomize edit set image` in the CD pipeline.
+images:
+  - name: dora-backend
+    newName: REPLACE_AT_DEPLOY.dkr.ecr.REGION.amazonaws.com/dora-backend
+    newTag: placeholder
+  - name: dora-frontend
+    newName: REPLACE_AT_DEPLOY.dkr.ecr.REGION.amazonaws.com/dora-frontend
+    newTag: placeholder
+
+patches:
+  # Add IRSA annotation to dora-backend SA.
+  - path: serviceaccount-irsa-patch.yaml
+    target:
+      kind: ServiceAccount
+      name: dora-backend

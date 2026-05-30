@@ -14,9 +14,8 @@ spec:
   template:
     metadata:
       labels: { app: dora-backend }
-      annotations:
-        # Force a rolling restart when the secret changes (set by your CD).
-        checksum/secrets: "{{REPLACE_AT_DEPLOY}}"
+      # CD pipelines may inject `checksum/secrets` annotation here to force a
+      # rolling restart when the Secret content changes — not required in base.
     spec:
       serviceAccountName: dora-backend
       automountServiceAccountToken: true
@@ -28,17 +27,18 @@ spec:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: backend
-          # Pin to immutable digest in production; CD pipeline replaces this.
-          image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/dora-backend:${IMAGE_TAG}
+          # Image pinned per overlay (kustomize images: transformer).
+          image: dora-backend:placeholder
           imagePullPolicy: IfNotPresent
           ports:
             - { name: http, containerPort: 8000 }
           envFrom:
             - secretRef: { name: dora-secrets }
           env:
-            - { name: DORA_GITHUB_REPOS,           value: "REPLACE_WITH_OWNER/REPO" }
+            # Overridden per overlay via kustomize patches.
+            - { name: DORA_GITHUB_REPOS,           value: "owner/repo" }
             - { name: DORA_POLL_INTERVAL_MINUTES,  value: "15" }
-            - { name: DORA_CORS_ORIGINS,           value: "https://dora.example.com" }
+            - { name: DORA_CORS_ORIGINS,           value: "http://localhost:3000" }
             - { name: DORA_LOG_LEVEL,              value: "INFO" }
           resources:
             requests: { cpu: "250m", memory: "256Mi" }
