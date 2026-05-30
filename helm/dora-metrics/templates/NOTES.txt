@@ -1,0 +1,49 @@
+Thanks for installing dora-metrics ({{ .Chart.AppVersion }}).
+
+Mode: {{ .Values.mode }}
+Namespace: {{ include "dora.namespace" . }}
+
+{{- if eq .Values.mode "trial" }}
+
+Trial mode is port-forward only — no Ingress is created. To reach the dashboard:
+
+  kubectl -n {{ include "dora.namespace" . }} port-forward svc/dora-frontend 8080:8080
+  open http://localhost:8080
+
+To run the API locally:
+
+  kubectl -n {{ include "dora.namespace" . }} port-forward svc/dora-backend 8000:8000
+  curl http://localhost:8000/api/v1/health/ready
+
+⚠️  Trial mode runs Postgres in-cluster (1 replica, 1 StatefulSet) and is NOT
+    backed up. Don't store anything you can't lose.
+
+{{- end }}
+
+{{- if eq .Values.mode "production" }}
+
+Production mode expects:
+
+  - aws-load-balancer-controller installed (creates ALB from the Ingress)
+  - external-secrets-operator installed (reconciles dora-secrets from Secrets Manager)
+  - IRSA role: {{ .Values.backend.irsaRoleArn }}
+  - ACM cert:  {{ .Values.ingress.certificateArn }}
+
+The dora-migrate Job runs as a Helm pre-install/pre-upgrade hook. The
+backend Deployment will not become ready until Alembic is at head.
+
+To follow the migration logs:
+
+  kubectl -n {{ include "dora.namespace" . }} logs -f job/dora-migrate
+
+After ALB is up, point your DNS at:
+
+  kubectl -n {{ include "dora.namespace" . }} get ingress dora-ingress \
+    -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+
+{{- end }}
+
+⚠️  EKS Fargate caveat: NetworkPolicy is silently no-op on Fargate-only
+    clusters. The backend logs a WARN at startup if it detects one. See
+    docs/EKS-DEPLOY.md#fargate-clusters for the SGP / managed-node-group
+    alternatives.
