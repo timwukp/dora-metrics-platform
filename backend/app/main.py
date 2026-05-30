@@ -119,6 +119,29 @@ async def scheduled_claude_code_collection():
             db.close()
 
 
+def _warn_if_fargate() -> None:
+    """If we're running on EKS Fargate, NetworkPolicy is silently no-op
+    (Fargate uses its own datapath and does not run the VPC-CNI policy
+    enforcement). Log a loud WARNING so operators don't assume the
+    `default-deny-all` NetworkPolicy is actually doing anything.
+
+    The signal is the node name: Fargate-scheduled pods always run on
+    nodes named `fargate-…`. We get that via the downward API as
+    K8S_NODE_NAME (set in backend.yaml).
+    """
+    import os
+    node = os.environ.get("K8S_NODE_NAME", "")
+    if node.startswith("fargate-"):
+        logger.warning(
+            "DETECTED EKS FARGATE NODE (%s): NetworkPolicy is NOT enforced "
+            "on Fargate. The shipped default-deny-all NetworkPolicy is a "
+            "silent no-op. Use Security Groups for Pods (SGP) or replace "
+            "Fargate with a managed node group. See "
+            "docs/EKS-DEPLOY.md#fargate-clusters",
+            node,
+        )
+
+
 def _check_or_apply_migrations() -> None:
     """Schema is owned by Alembic. If `DORA_AUTO_MIGRATE` is true we run
     `alembic upgrade head` here (convenient for trial mode). Otherwise we
@@ -159,6 +182,7 @@ def _check_or_apply_migrations() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    _warn_if_fargate()
     _check_or_apply_migrations()
     scheduler.add_job(
         scheduled_github_collection, "interval",

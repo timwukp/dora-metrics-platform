@@ -69,8 +69,8 @@ All workflows pin `permissions:` to least-privilege, set `persist-credentials: f
 | Liveness, readiness, startup probes on backend | `backend.yaml` |
 | PodDisruptionBudget for zero-downtime drains | `backend.yaml`, `frontend.yaml` |
 | Topology spread across AZs | `backend.yaml`, `frontend.yaml` |
-| Default-deny NetworkPolicy + explicit allow-lists per app | `infra/k8s/networkpolicy.yaml` |
-| Postgres StatefulSet (gp3 PVC), only reachable from backend | `postgres.yaml` + NetworkPolicy |
+| Default-deny NetworkPolicy + explicit allow-lists per app (⚠️ silently no-op on EKS Fargate — see [EKS-DEPLOY.md#fargate-clusters](EKS-DEPLOY.md#fargate-clusters)) | `infra/k8s/base/networkpolicy.yaml` |
+| Postgres StatefulSet (gp3 PVC), only reachable from backend | `infra/k8s/overlays/trial/postgres.yaml` + NetworkPolicy |
 | Dedicated ServiceAccounts; `automountServiceAccountToken: false` where unused | `serviceaccounts.yaml` |
 | AWS Secrets Manager via External Secrets Operator (production) | `external-secrets.yaml` |
 | Plaintext `secrets.yaml` removed from repo; only `secrets.example.yaml` shipped | `infra/k8s/secrets.example.yaml` |
