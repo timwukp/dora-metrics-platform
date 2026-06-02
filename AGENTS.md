@@ -36,7 +36,7 @@ relax.
 
 | # | Invariant | Why |
 |---|---|---|
-| 1 | **Repository stays PRIVATE on GitHub.** | The placeholder secrets, AWS account references, and trial cluster details are not for public consumption. |
+| 1 | **If you fork or adapt this repo for your own deployment, keep your fork PRIVATE.** This upstream repo is public on purpose (showcase + methodology reference). | Once you fill in real AWS account IDs, cluster ARNs, secrets, or webhook tokens, the placeholders become real values — and a public fork would expose them. |
 | 2 | **Trial mode is port-forward only.** No public Ingress, no ALB, no public LoadBalancer in the trial overlay or trial Helm preset. | The trial deployment is for evaluation; exposing endpoints multiplies the attack surface and the threat model in `SECURITY.md` doesn't cover open ingress for trial. |
 | 3 | **API key files are `chmod 600`.** `scripts/trial-bootstrap.sh` writes `~/.config/dora/apikey` at 600 — preserve this when touching install scripts. | Anyone with read access to the home dir would otherwise inherit auth. |
 | 4 | **No new AWS services beyond what trial currently uses.** Current set: EKS, ECR, IAM (IRSA), CloudWatch (logs only at present). New services need an issue + maintainer approval. | Keeps the trial install one-command and the cost model predictable. |
